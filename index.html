@@ -20,10 +20,16 @@
         class="header-meta"
         style="display: flex; align-items: center; gap: 12px"
       >
-        <span
-          ><strong id="hdr-total">—</strong> tickets ·
-          <strong id="hdr-period">—</strong></span
-        >
+        <span style="display:flex;align-items:center;gap:6px;font-size:clamp(10px,1vw+6px,12px);color:var(--text3)">
+          <strong id="hdr-total" style="color:var(--text2)">—</strong>
+          <span style="color:var(--text3)">tickets</span>
+          <span style="color:var(--border)">·</span>
+          <input type="date" id="f-date-from" onchange="applyFilters()"
+            style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-size:clamp(10px,1vw+6px,12px);padding:2px 4px;cursor:pointer;outline:none;font-family:inherit;width:auto;" />
+          <span style="color:var(--text3)">→</span>
+          <input type="date" id="f-date-to" onchange="applyFilters()"
+            style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-size:clamp(10px,1vw+6px,12px);padding:2px 4px;cursor:pointer;outline:none;font-family:inherit;width:auto;" />
+        </span>
         <button
           class="btn-import"
           onclick="document.getElementById('csv-input').click()"
@@ -104,14 +110,6 @@
         <select id="f-day" onchange="applyFilters()">
           <option value="">Todos</option>
         </select>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">De</span>
-        <input type="date" id="f-date-from" onchange="applyFilters()" />
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Até</span>
-        <input type="date" id="f-date-to" onchange="applyFilters()" />
       </div>
       <button class="btn-clear" onclick="clearFilters()">✕ Limpar</button>
     </div>

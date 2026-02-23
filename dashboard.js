@@ -246,11 +246,15 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  ["f-month", "f-agent", "f-status", "f-motivo", "f-tab", "f-day", "f-date-from", "f-date-to"].forEach(
-    (id) => {
-      document.getElementById(id).value = "";
-    },
+  ["f-month", "f-agent", "f-status", "f-motivo", "f-tab", "f-day"].forEach(
+    (id) => { document.getElementById(id).value = ""; },
   );
+  // Reset date range to full data range
+  const isoDates = RAW_DATA.map((r) => toISO(r.dt)).filter(Boolean).sort();
+  if (isoDates.length) {
+    document.getElementById("f-date-from").value = isoDates[0];
+    document.getElementById("f-date-to").value = isoDates[isoDates.length - 1];
+  }
   applyFilters();
 }
 
@@ -306,13 +310,8 @@ function renderExecutive(d) {
   document.getElementById("kpi-sla5").textContent =
     pct(sla5, frVals.length) + "%";
 
-  // Header
-  document.getElementById("hdr-total").textContent =
-    total.toLocaleString("pt-BR");
-  const dates = d.map((r) => r.dt).sort((a, b) => (toISO(a) > toISO(b) ? 1 : -1));
-  if (dates.length)
-    document.getElementById("hdr-period").textContent =
-      fmtDate(dates[0]) + " → " + fmtDate(dates[dates.length - 1]);
+  // Header — update ticket count (date inputs stay as-is, user edits them directly)
+  document.getElementById("hdr-total").textContent = total.toLocaleString("pt-BR");
   document.getElementById("vol-badge").textContent = `${daysSet.size} dias`;
 
   // Chart: volume by date
@@ -1216,6 +1215,16 @@ function handleCSVImport(event) {
       }
       RAW_DATA = parsed;
       populateFilters();
+      // Auto-set date range from data
+      const isoDates = parsed.map((r) => toISO(r.dt)).filter(Boolean).sort();
+      if (isoDates.length) {
+        const minD = isoDates[0];
+        const maxD = isoDates[isoDates.length - 1];
+        const fromEl = document.getElementById("f-date-from");
+        const toEl = document.getElementById("f-date-to");
+        fromEl.min = minD; fromEl.max = maxD; fromEl.value = minD;
+        toEl.min = minD; toEl.max = maxD; toEl.value = maxD;
+      }
       filteredData = RAW_DATA;
       clearFilters();
       document.getElementById("empty-state").style.display = "none";
