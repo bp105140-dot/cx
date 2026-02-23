@@ -597,7 +597,444 @@ tr:hover td {
   background: var(--text3);
 }
 
-/* IMPORT TOAST */
+
+/* ============================================================
+   PRESENTATION BUTTON (HEADER)
+   ============================================================ */
+.btn-present {
+  background: linear-gradient(135deg, rgba(0,212,255,0.12), rgba(124,58,237,0.12));
+  border: 1px solid rgba(0,212,255,0.4);
+  color: var(--accent);
+  padding: 6px clamp(10px,1.5vw,14px);
+  border-radius: 20px;
+  font-size: clamp(11px,1vw+6px,12px);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-present:hover:not(:disabled) {
+  background: rgba(0,212,255,0.2);
+  box-shadow: 0 0 12px rgba(0,212,255,0.2);
+}
+.btn-present:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--border);
+  color: var(--text3);
+}
+
+/* ============================================================
+   PRESENTATION OVERLAY
+   ============================================================ */
+.pres-overlay {
+  position: fixed;
+  inset: 0;
+  background: #060810;
+  z-index: 2000;
+  font-family: "DM Sans", sans-serif;
+}
+
+/* CONFIG */
+.pres-config {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  overflow-y: auto;
+}
+.pres-config-inner {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 860px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+.pres-config-header {
+  background: linear-gradient(135deg, #0d1221, #111827);
+  padding: 28px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+.pres-config-header > span { font-size: 40px; display: block; margin-bottom: 10px; }
+.pres-config-header h2 {
+  font-family: "Syne", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+.pres-config-header p { color: var(--text3); font-size: 13px; margin-top: 4px; }
+
+.pres-config-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  overflow: hidden;
+}
+.pres-config-col { padding: 22px 24px; overflow-y: auto; }
+.pres-config-col:first-child { border-right: 1px solid var(--border); }
+.pres-config-section {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+.pres-slide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+.pres-slide-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+.pres-slide-item:hover { background: rgba(255,255,255,0.04); }
+.pres-slide-item input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.pres-slide-item-label { font-size: 13px; color: var(--text); flex: 1; }
+.pres-slide-item-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pres-opt-row { }
+.pres-opt-label {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.pres-toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.2s;
+}
+.pres-toggle-label:hover { border-color: var(--accent); }
+.pres-toggle-info > span {
+  font-size: 13px;
+  color: var(--text);
+  display: block;
+  font-weight: 500;
+}
+.pres-toggle-info > small { font-size: 11px; color: var(--text3); }
+.pres-toggle {
+  width: 42px;
+  height: 24px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+.pres-toggle.on { background: var(--accent); border-color: var(--accent); }
+.pres-toggle-knob {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: left 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.pres-toggle.on .pres-toggle-knob { left: 20px; }
+
+.pres-interval-btns {
+  display: flex;
+  gap: 6px;
+}
+.pres-int-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.pres-int-btn:hover, .pres-int-active {
+  background: rgba(0,212,255,0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pres-config-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: rgba(0,0,0,0.15);
+}
+.pres-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.pres-btn-cancel:hover { border-color: var(--text2); color: var(--text); }
+.pres-btn-start {
+  background: linear-gradient(135deg, #00d4ff, #7c3aed);
+  border: none;
+  color: #fff;
+  padding: 9px 28px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  transition: opacity 0.2s;
+}
+.pres-btn-start:hover { opacity: 0.88; }
+
+/* SLIDESHOW */
+.pres-show {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.pres-top-bar {
+  background: linear-gradient(135deg, #0a0d14, #0d1221);
+  border-bottom: 1px solid var(--border);
+  padding: 0 36px;
+  height: 66px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.pres-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Syne", sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #fff;
+  min-width: 200px;
+}
+.pres-logo-icon {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, #00d4ff, #7c3aed);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.pres-slide-title {
+  font-family: "Syne", sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  flex: 1;
+}
+.pres-clock {
+  font-family: "Syne", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text2);
+  letter-spacing: 2px;
+  min-width: 200px;
+  text-align: right;
+}
+.pres-content {
+  flex: 1;
+  overflow: hidden;
+  padding: 28px 36px 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pres-bottom-bar {
+  background: rgba(6,8,16,0.95);
+  border-top: 1px solid var(--border);
+  padding: 0 36px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.pres-controls { display: flex; gap: 6px; }
+.pres-ctrl-btn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 5px 13px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.pres-ctrl-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+.pres-exit-btn { color: #ef4444 !important; border-color: rgba(239,68,68,0.3) !important; }
+.pres-exit-btn:hover { background: rgba(239,68,68,0.1) !important; }
+.pres-counter { font-size: 12px; color: var(--text3); white-space: nowrap; }
+.pres-progress-wrap {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pres-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #7c3aed);
+  border-radius: 2px;
+  width: 0%;
+}
+
+/* SLIDE CONTENT — KPI GRID */
+.pres-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  flex: 1;
+  align-content: center;
+}
+.pres-kpi-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 22px;
+  position: relative;
+  overflow: hidden;
+}
+.pres-kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--accent-color, var(--accent));
+}
+.pres-kpi-icon { font-size: 30px; margin-bottom: 14px; display: block; }
+.pres-kpi-value {
+  font-family: "Syne", sans-serif;
+  font-size: clamp(32px, 3.5vw, 52px);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+.pres-kpi-label {
+  font-size: 13px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+}
+.pres-kpi-sub { font-size: 12px; color: var(--text2); margin-top: 5px; }
+
+/* SLIDE CONTENT — SINGLE CHART */
+.pres-chart-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  width: 100%;
+}
+
+/* SLIDE CONTENT — TWO CHARTS */
+.pres-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+}
+.pres-chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+}
+.pres-chart-card-title {
+  font-family: "Syne", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+/* SLIDE — SLA FAIXAS */
+.pres-sla-faixas {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-shrink: 0;
+}
+.pres-sla-faixa {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+.pres-sla-val {
+  font-family: "Syne", sans-serif;
+  font-size: clamp(24px, 2.5vw, 38px);
+  font-weight: 800;
+  color: #fff;
+}
+.pres-sla-lbl { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* Slide transition fade */
+@keyframes presSlideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pres-content > * { animation: presSlideIn 0.4s ease; }
+
 .import-toast {
   position: fixed;
   bottom: 24px;

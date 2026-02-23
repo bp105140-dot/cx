@@ -30,6 +30,9 @@
           <input type="date" id="f-date-to" onchange="applyFilters()"
             style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-size:clamp(10px,1vw+6px,12px);padding:2px 4px;cursor:pointer;outline:none;font-family:inherit;width:auto;" />
         </span>
+        <button class="btn-present" id="btn-present" onclick="openPresentationConfig()" disabled>
+          📺 Apresentação
+        </button>
         <button
           class="btn-import"
           onclick="document.getElementById('csv-input').click()"
@@ -502,6 +505,93 @@
         </div>
       </div>
     </div>
+
+    <!-- ============================================================ -->
+    <!-- PRESENTATION MODE OVERLAY -->
+    <!-- ============================================================ -->
+    <div id="pres-overlay" class="pres-overlay" style="display:none">
+
+      <!-- CONFIG SCREEN -->
+      <div id="pres-config" class="pres-config">
+        <div class="pres-config-inner">
+          <div class="pres-config-header">
+            <span>📺</span>
+            <h2>Modo Apresentação</h2>
+            <p>Selecione os visuais que ficarão rodando na TV</p>
+          </div>
+          <div class="pres-config-body">
+            <div class="pres-config-col">
+              <div class="pres-config-section">Visuais disponíveis</div>
+              <div id="pres-slide-list" class="pres-slide-list"></div>
+            </div>
+            <div class="pres-config-col">
+              <div class="pres-config-section">Configurações</div>
+              <div class="pres-opt-row">
+                <label class="pres-toggle-label" onclick="presToggleAgents()">
+                  <div class="pres-toggle-info">
+                    <span>🔒 Ocultar nomes dos agentes</span>
+                    <small>Substitui por Agente 1, Agente 2…</small>
+                  </div>
+                  <div class="pres-toggle" id="toggle-hide-agents">
+                    <div class="pres-toggle-knob"></div>
+                  </div>
+                </label>
+              </div>
+              <div class="pres-opt-row" style="margin-top:20px">
+                <div class="pres-opt-label">⏱ Intervalo entre slides</div>
+                <div class="pres-interval-btns">
+                  <button class="pres-int-btn" data-v="10" onclick="presSetInterval(10)">10s</button>
+                  <button class="pres-int-btn pres-int-active" data-v="15" onclick="presSetInterval(15)">15s</button>
+                  <button class="pres-int-btn" data-v="20" onclick="presSetInterval(20)">20s</button>
+                  <button class="pres-int-btn" data-v="30" onclick="presSetInterval(30)">30s</button>
+                </div>
+              </div>
+              <div class="pres-opt-row" style="margin-top:20px">
+                <div class="pres-opt-label">Seleção rápida</div>
+                <div style="display:flex;gap:6px;flex-wrap:wrap">
+                  <button class="pres-int-btn" onclick="presSelectAll()">✓ Todos</button>
+                  <button class="pres-int-btn" onclick="presSelectNone()">✕ Nenhum</button>
+                  <button class="pres-int-btn" onclick="presSelectNoAgents()">🔒 Sem agentes</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="pres-config-footer">
+            <button class="pres-btn-cancel" onclick="closePresentationConfig()">✕ Cancelar</button>
+            <button class="pres-btn-start" onclick="startPresentation()">▶ Iniciar Apresentação</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDESHOW SCREEN -->
+      <div id="pres-show" class="pres-show" style="display:none">
+        <div class="pres-top-bar">
+          <div class="pres-logo">
+            <div class="pres-logo-icon">💬</div>
+            <span>CX King Star</span>
+          </div>
+          <div class="pres-slide-title" id="pres-slide-title">—</div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:200px;gap:2px">
+            <div class="pres-clock" id="pres-clock">00:00:00</div>
+            <div id="pres-period" style="font-size:11px;color:var(--text3);letter-spacing:0.5px;font-family:'DM Sans',sans-serif"></div>
+          </div>
+        </div>
+        <div class="pres-content" id="pres-content"></div>
+        <div class="pres-bottom-bar">
+          <div class="pres-controls">
+            <button class="pres-ctrl-btn" onclick="presGoPrev()" title="Anterior">◀</button>
+            <button class="pres-ctrl-btn" id="pres-pause-btn" onclick="presTogglePause()" title="Pausar">⏸</button>
+            <button class="pres-ctrl-btn" onclick="presGoNext()" title="Próximo">▶</button>
+            <button class="pres-ctrl-btn pres-exit-btn" onclick="closePresentation()">✕ Sair</button>
+          </div>
+          <div class="pres-counter" id="pres-counter">1 / 1</div>
+          <div class="pres-progress-wrap">
+            <div class="pres-progress-bar" id="pres-progress-bar"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /pres-overlay -->
 
     <script src="dashboard.js"></script>
   </body>
