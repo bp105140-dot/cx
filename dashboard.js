@@ -41,6 +41,16 @@ const DAYS_ORDER = [
   "Quinta-feira",
   "Sexta-feira",
 ];
+
+const MONTH_ORDER = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+];
+
+// Sort months in calendar order from a set of month name strings
+function sortMonths(monthSet) {
+  return [...monthSet].sort((a, b) => MONTH_ORDER.indexOf(a) - MONTH_ORDER.indexOf(b));
+}
 const COLORS = [
   "#00d4ff",
   "#7c3aed",
@@ -154,7 +164,7 @@ function populateFilters() {
     sel2.appendChild(o);
   });
 
-  const months = [...new Set(RAW_DATA.map((r) => r.mo))].sort();
+  const months = sortMonths(new Set(RAW_DATA.map((r) => r.mo).filter(Boolean)));
   const sel4 = document.getElementById("f-month");
   sel4.innerHTML = '<option value="">Todos</option>';
   months.forEach((m) => {
@@ -532,8 +542,8 @@ function renderSLA(d) {
     },
   });
 
-  // SLA Trend (by month) - FR and TR avg
-  const months = ["Janeiro", "Fevereiro"];
+  // SLA Trend (by month) - FR and TR avg — dynamic months from data
+  const months = sortMonths(new Set(d.map((r) => r.mo).filter(Boolean)));
   const mFR = months.map((m) =>
     avg(
       d
@@ -909,9 +919,9 @@ function renderCauses(d) {
     }
   });
 
-  // Motivo por Mês
-  const months = ["Janeiro", "Fevereiro"];
-  const motivos = ["INFORMAÇÃO", "SOLICITAÇÃO", "RECLAMAÇÃO"];
+  // Motivo por Mês — dynamic months
+  const months = sortMonths(new Set(d.map((r) => r.mo).filter(Boolean)));
+  const motivos = [...new Set(d.map((r) => r.mt).filter(Boolean))];
   makeChart("chart-motivo-month", {
     type: "bar",
     data: {
@@ -1193,7 +1203,21 @@ function handleCSVImport(event) {
       reader.readAsText(file, encoding);
     });
 
-  tryParse("windows-1252")
+  // Smart encoding detection: try UTF-8 first, validate by checking known Portuguese month names
+  // If months are garbled (windows-1252 file read as UTF-8), retry with windows-1252
+  const PT_MONTHS = new Set(["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+    "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]);
+
+  tryParse("utf-8").then((parsed) => {
+    if (parsed.length > 0) {
+      const sampleMo = parsed[0].mo || "";
+      if (sampleMo && !PT_MONTHS.has(sampleMo)) {
+        // Garbled — retry as windows-1252
+        return tryParse("windows-1252");
+      }
+    }
+    return parsed;
+  })
     .then((parsed) => {
       if (!parsed.length) {
         showToast("⚠️ Nenhum registro encontrado no CSV.", true);
@@ -1249,7 +1273,8 @@ function parseCSV(text) {
 
     rawHeaders.forEach((h, idx) => {
       const key = CSV_HEADER_MAP[h.trim()] || h.trim();
-      let val = vals[idx] !== undefined ? vals[idx].trim() : "";
+      // Strip regular whitespace AND non-breaking spaces (\xa0) from all values
+      let val = vals[idx] !== undefined ? vals[idx].replace(/[\u00a0\u200b\ufeff]/g, " ").trim() : "";
       obj[key] = val;
     });
 
