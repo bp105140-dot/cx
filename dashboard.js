@@ -17,6 +17,23 @@ const median = (arr) => {
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 const fmt = (n) => (n != null ? Math.round(n) : "—");
 
+// Normalise any date string to ISO yyyy-mm-dd for comparisons
+function toISO(str) {
+  if (!str) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+  const m = str.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return str.slice(0, 10);
+}
+
+// Format ISO date (or any date) to dd/mm/yyyy for display
+function fmtDate(str) {
+  const iso = toISO(str);
+  if (!iso) return str || "—";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 const DAYS_ORDER = [
   "Segunda-feira",
   "Terça-feira",
@@ -202,6 +219,8 @@ function getFilters() {
     motivo: document.getElementById("f-motivo").value,
     tab: document.getElementById("f-tab").value,
     day: document.getElementById("f-day").value,
+    dateFrom: document.getElementById("f-date-from").value, // yyyy-mm-dd (input type=date)
+    dateTo: document.getElementById("f-date-to").value,
   };
 }
 
@@ -214,13 +233,20 @@ function applyFilters() {
     if (f.motivo && r.mt !== f.motivo) return false;
     if (f.tab && r.tb !== f.tab) return false;
     if (f.day && r.dw !== f.day) return false;
+    if (f.dateFrom || f.dateTo) {
+      const iso = toISO(r.dt);
+      if (iso) {
+        if (f.dateFrom && iso < f.dateFrom) return false;
+        if (f.dateTo && iso > f.dateTo) return false;
+      }
+    }
     return true;
   });
   renderAll();
 }
 
 function clearFilters() {
-  ["f-month", "f-agent", "f-status", "f-motivo", "f-tab", "f-day"].forEach(
+  ["f-month", "f-agent", "f-status", "f-motivo", "f-tab", "f-day", "f-date-from", "f-date-to"].forEach(
     (id) => {
       document.getElementById(id).value = "";
     },
@@ -283,10 +309,10 @@ function renderExecutive(d) {
   // Header
   document.getElementById("hdr-total").textContent =
     total.toLocaleString("pt-BR");
-  const dates = d.map((r) => r.dt).sort();
+  const dates = d.map((r) => r.dt).sort((a, b) => (toISO(a) > toISO(b) ? 1 : -1));
   if (dates.length)
     document.getElementById("hdr-period").textContent =
-      dates[0] + " → " + dates[dates.length - 1];
+      fmtDate(dates[0]) + " → " + fmtDate(dates[dates.length - 1]);
   document.getElementById("vol-badge").textContent = `${daysSet.size} dias`;
 
   // Chart: volume by date
@@ -294,11 +320,11 @@ function renderExecutive(d) {
   d.forEach((r) => {
     dateCount[r.dt] = (dateCount[r.dt] || 0) + 1;
   });
-  const sortedDates = Object.keys(dateCount).sort();
+  const sortedDates = Object.keys(dateCount).sort((a, b) => (toISO(a) > toISO(b) ? 1 : -1));
   makeChart("chart-volume-day", {
     type: "line",
     data: {
-      labels: sortedDates,
+      labels: sortedDates.map(fmtDate),
       datasets: [
         {
           label: "Tickets",

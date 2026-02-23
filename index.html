@@ -6,7 +6,7 @@
     <title>Dashboard WhatsApp CX</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="header">
@@ -16,12 +16,27 @@
           <div class="header-title">CX <span> King Star Colchões </span></div>
         </div>
       </div>
-      <div class="header-meta" style="display:flex;align-items:center;gap:12px;">
-        <span><strong id="hdr-total">—</strong> tickets · <strong id="hdr-period">—</strong></span>
-        <button class="btn-import" onclick="document.getElementById('csv-input').click()">
+      <div
+        class="header-meta"
+        style="display: flex; align-items: center; gap: 12px"
+      >
+        <span
+          ><strong id="hdr-total">—</strong> tickets ·
+          <strong id="hdr-period">—</strong></span
+        >
+        <button
+          class="btn-import"
+          onclick="document.getElementById('csv-input').click()"
+        >
           📂 Importar CSV
         </button>
-        <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
+        <input
+          type="file"
+          id="csv-input"
+          accept=".csv"
+          style="display: none"
+          onchange="handleCSVImport(event)"
+        />
       </div>
     </div>
 
@@ -90,19 +105,42 @@
           <option value="">Todos</option>
         </select>
       </div>
+      <div class="filter-group">
+        <span class="filter-label">De</span>
+        <input type="date" id="f-date-from" onchange="applyFilters()" />
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Até</span>
+        <input type="date" id="f-date-to" onchange="applyFilters()" />
+      </div>
       <button class="btn-clear" onclick="clearFilters()">✕ Limpar</button>
     </div>
 
     <!-- EMPTY STATE -->
-    <div id="empty-state" class="empty-state" style="display:none">
+    <div id="empty-state" class="empty-state" style="display: none">
       <div class="empty-icon">📊</div>
       <h2>Nenhum dado carregado</h2>
-      <p>Importe um arquivo CSV para visualizar o dashboard. O arquivo deve conter os dados de tickets exportados do sistema.</p>
+      <p>
+        Importe um arquivo CSV para visualizar o dashboard. O arquivo deve
+        conter os dados de tickets exportados do sistema.
+      </p>
       <div class="csv-hint">
-        <div style="margin-bottom:8px;font-weight:600;color:var(--text)">Colunas esperadas no CSV:</div>
-        <strong>dt</strong> (data), <strong>mo</strong> (mês), <strong>dw</strong> (dia semana), <strong>hr</strong> (hora), <strong>id</strong>, <strong>st</strong> (status), <strong>ch</strong> (canal), <strong>ag</strong> (agente), <strong>ci</strong> (cliente), <strong>mt</strong> (motivo), <strong>tb</strong> (tabulação), <strong>fr</strong> (first reply min), <strong>tr</strong> (tempo resolução), <strong>ar</strong> (agente response)
+        <div style="margin-bottom: 8px; font-weight: 600; color: var(--text)">
+          Colunas esperadas no CSV:
+        </div>
+        <strong>dt</strong> (data), <strong>mo</strong> (mês),
+        <strong>dw</strong> (dia semana), <strong>hr</strong> (hora),
+        <strong>id</strong>, <strong>st</strong> (status),
+        <strong>ch</strong> (canal), <strong>ag</strong> (agente),
+        <strong>ci</strong> (cliente), <strong>mt</strong> (motivo),
+        <strong>tb</strong> (tabulação), <strong>fr</strong> (first reply min),
+        <strong>tr</strong> (tempo resolução), <strong>ar</strong> (agente
+        response)
       </div>
-      <button class="btn-import-sm" onclick="document.getElementById('csv-input').click()">
+      <button
+        class="btn-import-sm"
+        onclick="document.getElementById('csv-input').click()"
+      >
         📂 Importar CSV
       </button>
     </div>
