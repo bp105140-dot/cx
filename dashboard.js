@@ -1162,7 +1162,8 @@ function sortTable(tbodyId, colIdx) {
 // ============================================================
 // Mapeamento dos cabeçalhos reais do CSV para as chaves internas do dashboard
 const CSV_HEADER_MAP = {
-  "Criação do ticket Data": "dt",
+  "Criação do ticket Data": "dt",        // formato antigo
+  "Criação do ticket - Data": "dt",      // formato novo (com " - ")
   "Criação do ticket - Mês": "mo",
   "Criação do ticket - Dia da semana": "dw",
   "Criação do ticket - Hora": "hr",
