@@ -36,8 +36,10 @@ Chart.register({
   },
 });
 
-// ── Plugin: rótulos de barras horizontais desenhados direto no canvas ──
-// Garante textBaseline="middle" = alinhamento vertical perfeito com a barra.
+
+// ── Plugin hbarLabels: desenha rótulos de barras horizontais direto no canvas ──
+// Usa textBaseline="middle" para alinhamento vertical perfeito com a barra.
+// O datalabels plugin é desativado nas hbars dentro de injectDatalabels().
 Chart.register({
   id: "hbarLabels",
   afterDatasetsDraw(chart) {
@@ -464,7 +466,10 @@ function toggleLabels() {
     document.createTextNode(" Rótulos: " + (showLabels ? "ON" : "OFF")),
   );
   btn.classList.toggle("on", showLabels);
-  renderAll();
+  // Atualiza apenas os gráficos existentes sem recriar do zero.
+  // Isso evita que hbarLabels e datalabels sejam acionados duas vezes
+  // durante o ciclo de animação da recriação, o que causava duplicação.
+  Object.values(CHARTS).forEach((c) => { if (c) c.update(); });
 }
 function injectDatalabels(cfg) {
   if (!cfg.options) cfg.options = {};
@@ -504,19 +509,23 @@ function injectDatalabels(cfg) {
     return value;
   };
 
-  cfg.options.plugins.datalabels = {
-    display   : isHBar ? false : showLabels,  // hbars: desenhado pelo plugin hbarLabels
-    color     : "#e2e8f0",
-    font      : { family: "DM Sans", size: 11, weight: "normal" },
-    formatter : fmt_val,
-    // hbar: anchor=end places label at bar tip; align=end pushes it outside (right)
-    anchor    : isDoughnut ? "end" : "end",
-    align     : isDoughnut ? "end" : isHBar ? "end" : "top",
-    offset    : isDoughnut ? 18    : isHBar  ? 4    : isLine ? 8 : 4,
-    clamp     : true,
-    clip      : false,
-    padding   : { top: 0, bottom: 0, left: isHBar ? 4 : 2, right: 2 },
-  };
+  // hbars: datalabels desativado — rótulos desenhados pelo plugin hbarLabels
+  if (isHBar) {
+    cfg.options.plugins.datalabels = { display: false };
+  } else {
+    cfg.options.plugins.datalabels = {
+      display   : () => showLabels,
+      color     : "#e2e8f0",
+      font      : { family: "DM Sans", size: 11, weight: "normal" },
+      formatter : fmt_val,
+      anchor    : isDoughnut ? "end" : "end",
+      align     : isDoughnut ? "end" : "top",
+      offset    : isDoughnut ? 18    : isLine ? 8 : 4,
+      clamp     : true,
+      clip      : false,
+      padding   : { top: 0, bottom: 0, left: 2, right: 2 },
+    };
+  }
 
   // Always add layout padding so chart size is stable (doesn't jump on toggle)
   if (!cfg.options.layout) cfg.options.layout = {};
