@@ -1,6 +1,41 @@
 // Register datalabels plugin globally
 Chart.register(ChartDataLabels);
 
+// ── Leader-lines plugin: draws a short line from arc edge to each visible datalabel ──
+Chart.register({
+  id: "doughnutLeaderLines",
+  afterDatasetsDraw(chart) {
+    if (!showLabels) return;
+    if (chart.config.type !== "doughnut" && chart.config.type !== "pie") return;
+    const dl = chart.options?.plugins?.datalabels;
+    if (!dl) return;
+    const meta = chart.getDatasetMeta(0);
+    if (!meta?.data) return;
+    const { left, right, top, bottom } = chart.chartArea;
+    const cx = (left + right) / 2;
+    const cy = (top + bottom) / 2;
+    const data = chart.data.datasets[0].data;
+    const total = data.reduce((a, b) => (a || 0) + (b || 0), 0);
+    const lineLen = 14;
+    const ctx = chart.ctx;
+    ctx.save();
+    meta.data.forEach((arc, i) => {
+      const val = data[i];
+      if (!val || !total) return;
+      if ((val / total) < 0.015) return; // skip tiny slices
+      const midAngle = (arc.startAngle + arc.endAngle) / 2;
+      const r = arc.outerRadius;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(midAngle) * (r + 2), cy + Math.sin(midAngle) * (r + 2));
+      ctx.lineTo(cx + Math.cos(midAngle) * (r + lineLen), cy + Math.sin(midAngle) * (r + lineLen));
+      ctx.strokeStyle = "rgba(226,232,240,0.5)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+    ctx.restore();
+  },
+});
+
 let RAW_DATA = [];
 
 // ============================================================
@@ -64,6 +99,327 @@ const COLORS = [
   "#ec4899",
 ];
 
+// Status translation (English → Portuguese)
+const STATUS_MAP = {
+  "Open":     "Aberto",
+  "open":     "Aberto",
+  "Closed":   "Fechado",
+  "closed":   "Fechado",
+  "Solved":   "Resolvido",
+  "solved":   "Resolvido",
+  "Pending":  "Pendente",
+  "pending":  "Pendente",
+  "Hold":     "Em Espera",
+  "hold":     "Em Espera",
+  "New":      "Novo",
+  "new":      "Novo",
+  "In Progress": "Em Andamento",
+};
+function translateStatus(s) {
+  if (!s) return "(Sem info)";
+  return STATUS_MAP[s] || s;
+}
+
+// Return label or "(Sem info)" when empty/null
+function lblOrNA(s) {
+  if (s == null || String(s).trim() === "") return "(Sem info)";
+  return String(s);
+}
+
+// ============================================================
+// INFO SYSTEM
+// ============================================================
+const CHART_INFO = {
+  "kpis-exec": {
+    icon: "🎯", title: "KPIs Principais",
+    desc: "Painel de métricas-chave que resumem a saúde operacional do atendimento. Cada card representa um indicador estratégico que, em conjunto, dá uma visão completa do desempenho do time.",
+    insight: "Analise sempre em conjunto: um alto volume de tickets com baixa taxa de fechamento sinaliza gargalo. Uma média diária crescente sem aumento de equipe pressiona o tempo de resposta. Cruze esses indicadores antes de tomar decisões de dimensionamento."
+  },
+  "chart-volume-day": {
+    icon: "📈", title: "Volume por Data",
+    desc: "Quantidade de tickets abertos em cada dia do período analisado. Permite visualizar tendências, picos e variações no volume de demanda ao longo do tempo.",
+    insight: "Picos abruptos de volume geralmente são causados por eventos externos: promoções, falhas sistêmicas, datas comemorativas ou campanhas de marketing. Identifique os dias de maior volume e investigue a causa raiz — isso permite criar planos de contingência e alocar reforços preventivamente."
+  },
+  "chart-status": {
+    icon: "📊", title: "Distribuição de Status",
+    desc: "Proporção de tickets em cada estado (Fechado, Aberto, Pendente, etc.). Mostra como está a saúde da fila de atendimento em tempo real.",
+    insight: "Uma fila saudável tem a maior parte dos tickets em 'Fechado' ou 'Resolvido'. Alta proporção de 'Aberto' ou 'Pendente' indica backlog acumulado. 'Em Espera' pode significar dependência de terceiros ou do cliente — vale monitorar para evitar tickets esquecidos na fila."
+  },
+  "chart-month": {
+    icon: "📞", title: "Volume por Mês",
+    desc: "Evolução mensal do número de tickets recebidos. Útil para identificar sazonalidade e planejar a capacidade do time nos próximos períodos.",
+    insight: "Observe se há meses consistentemente mais altos — isso define o 'pico sazonal' da operação. Com esse padrão identificado, é possível planejar contratações temporárias, treinamentos e revisão de processos antes que o pico chegue, ao invés de reagir durante ele."
+  },
+  "chart-dayofweek": {
+    icon: "🕐", title: "Volume por Dia da Semana",
+    desc: "Distribuição dos tickets pelos dias da semana. Revela quais dias concentram maior demanda de atendimento.",
+    insight: "Se segundas e terças concentram volume, pode ser reflexo de acúmulo do fim de semana. Dias com volume muito baixo podem indicar baixa cobertura de equipe, não necessariamente baixa demanda. Use esse dado para ajustar escalas de trabalho e garantir cobertura nos dias críticos."
+  },
+  "chart-motivo-pie": {
+    icon: "💬", title: "Motivo do Contato",
+    desc: "Proporção dos tipos de demanda que motivaram os clientes a abrir tickets. Revela o que mais gera atendimento na operação.",
+    insight: "Motivos com alta proporção que poderiam ser resolvidos com autoatendimento (FAQs, rastreio, segunda via) representam oportunidade de deflexão. Foque em criar conteúdo de autoatendimento para os top 2 motivos — isso pode reduzir o volume geral em 20–30% sem contratar mais pessoas."
+  },
+  "kpis-pr": {
+    icon: "⚡", title: "KPIs de Primeira Resposta (PR)",
+    desc: "Indicadores que medem a velocidade com que o time responde pela primeira vez a um ticket após sua abertura. A PR é o principal driver de satisfação percebida pelo cliente.",
+    insight: "O cliente não espera resolução imediata, mas espera reconhecimento rápido. Uma PR média abaixo de 5 minutos gera percepção de serviço premium. Acima de 30 minutos começa a gerar insatisfação independente da qualidade da resolução. Foque em reduzir a PR antes de otimizar o tempo de resolução total."
+  },
+  "faixas-pr": {
+    icon: "📊", title: "Faixas de Primeira Resposta",
+    desc: "Distribuição percentual dos tickets por faixa de tempo de primeira resposta (0–5 min, 5–15 min, 15–60 min, +60 min). Mostra onde se concentra o volume de atendimento em termos de velocidade.",
+    insight: "Idealmente, mais de 70% dos tickets devem estar na faixa 0–5 min. Se a faixa '+60 min' for expressiva, investigue: pode ser falta de agentes online em horários de pico, fila mal configurada, ou tickets caindo em filas erradas sem roteamento adequado."
+  },
+  "chart-fr-dist": {
+    icon: "⚡", title: "Distribuição da 1ª Resposta por Faixa",
+    desc: "Histograma que mostra a frequência de tickets em cada faixa de tempo de primeira resposta. Permite visualizar onde está concentrada a performance de velocidade do time.",
+    insight: "Uma distribuição 'deslocada à esquerda' (barras maiores nas faixas menores) indica excelente performance. Se a barra '+60 min' for visível, esses tickets devem ser investigados individualmente — geralmente são outliers de fim de turno, segunda-feira manhã, ou períodos de instabilidade do sistema."
+  },
+  "chart-tr-dist": {
+    icon: "🔄", title: "Distribuição do Tempo de Resolução",
+    desc: "Histograma que mostra a frequência de tickets em cada faixa de tempo total de resolução (do aberto ao fechado). Revela o perfil de complexidade dos atendimentos.",
+    insight: "Uma concentração alta em '+8h' indica tickets complexos ou processos internos lentos (como aprovações, fornecedores, logística). Identifique o motivo desses tickets — se forem de uma categoria específica, crie um SLA diferenciado e um fluxo de escalation dedicado para não misturar com atendimentos simples."
+  },
+  "chart-sla-trend": {
+    icon: "📈", title: "Evolução Mensal: PR e TR",
+    desc: "Linha do tempo comparando a evolução mensal da Primeira Resposta (PR) e do Tempo de Resolução (TR). Revela se a performance do time está melhorando, estável ou deteriorando ao longo dos meses.",
+    insight: "Se PR está caindo mas TR está subindo, o time está respondendo mais rápido porém resolvendo mais devagar — sinal de que há gargalo na resolução (processos, aprovações, falta de autonomia). Se ambos sobem, pode ser sinal de aumento de complexidade das demandas ou redução da equipe efetiva."
+  },
+  "chart-fr-dayofweek": {
+    icon: "🗓️", title: "PR Médio por Dia da Semana",
+    desc: "Tempo médio de primeira resposta agrupado por dia da semana. Revela em quais dias o atendimento é mais ágil ou mais lento.",
+    insight: "Dias com PR alto geralmente coincidem com menor cobertura de equipe (fins de semana, início da manhã) ou maior volume. Compare este gráfico com o de Volume por Dia — se o pico de PR coincidir com o pico de volume, o time não está dimensionado para o dia mais crítico."
+  },
+  "ranking-agentes": {
+    icon: "🏆", title: "Ranking de Agentes",
+    desc: "Comparativo de performance entre os agentes do time, considerando volume de tickets atendidos, tempo de resposta e tempo de resolução.",
+    insight: "Use este ranking não para punir, mas para identificar padrões. Agentes com alto volume e bom SLA são referência — vale mapear seus processos. Agentes com TR alto podem precisar de apoio em processos ou autonomia. Diferenças grandes entre agentes geralmente indicam oportunidade de padronização e treinamento."
+  },
+  "chart-agent-vol": {
+    icon: "🏆", title: "Volume por Agente",
+    desc: "Quantidade de tickets atendidos por cada agente no período. Mostra a distribuição de carga de trabalho entre os membros da equipe.",
+    insight: "Distribuição muito desigual de volume pode indicar filas mal configuradas, agentes com escopos diferentes, ou favorecimento/penalização na distribuição. Se um agente concentra muito mais que os outros, avalie se é escolha dele (cherry-picking) ou se é um problema de roteamento automático."
+  },
+  "chart-agent-fr": {
+    icon: "⚡", title: "PR Médio por Agente",
+    desc: "Tempo médio de primeira resposta de cada agente. Revela quem responde mais rapidamente aos clientes e quem apresenta maior demora.",
+    insight: "Grande variação entre agentes no mesmo turno e canal indica diferença de comportamento, não de carga. Agentes lentos podem estar priorizando resolução completa antes de responder (errado) ou simplesmente não vendo os tickets (problema de interface). Uma conversa individual resolve em 80% dos casos."
+  },
+  "chart-agent-tr": {
+    icon: "⏳", title: "TR Médio por Agente",
+    desc: "Tempo médio de resolução total por agente — do momento em que o ticket é aberto até o fechamento. Indica a eficiência e profundidade de resolução de cada um.",
+    insight: "TR alto pode ser reflexo de maior complexidade dos tickets (o agente atende casos difíceis) ou de falta de processos claros. Antes de concluir que um agente 'é lento', verifique o tipo de tickets que ele atende. Agente com TR alto e PR baixo geralmente é cuidadoso e resolutivo — isso é positivo."
+  },
+  "agent-table": {
+    icon: "📋", title: "Tabela Detalhada de Agentes",
+    desc: "Visão consolidada de todos os indicadores de cada agente: volume, percentual da operação, PR médio, TR médio, e medianas. Permite comparar múltiplas dimensões simultaneamente.",
+    insight: "Compare a coluna 'PR Médio' com 'PR Mediana': se a média for muito maior que a mediana, o agente tem poucos casos extremamente lentos puxando a média para cima. Esses outliers merecem investigação específica. A mediana é mais justa para avaliar a performance real do dia a dia."
+  },
+  "dist-motivos": {
+    icon: "📞", title: "Distribuição de Motivos e Causas",
+    desc: "Análise detalhada dos motivos de contato, tabulações e submotivos. Revela a estrutura completa das demandas recebidas e onde se concentram os problemas.",
+    insight: "Motivos de 'Reclamação' acima de 20% do volume total são um alerta — indica que algo estrutural está gerando insatisfação recorrente. Cruze com o pareto de submotivos para identificar qual processo específico precisa de correção urgente."
+  },
+  "chart-motivo-bar": {
+    icon: "📊", title: "Motivo do Contato (Barras)",
+    desc: "Volume de tickets por categoria de motivo de contato. Mostra de forma comparativa quais tipos de demanda são mais frequentes.",
+    insight: "Se 'Informação' domina o volume, há oportunidade clara de deflexão via FAQ ou chatbot. Se 'Reclamação' está crescendo, é sinal de deterioração em alguma etapa da jornada do cliente — investigue qual produto ou processo está gerando mais insatisfação recentemente."
+  },
+  "chart-tab-bar": {
+    icon: "🗂️", title: "Tabulação (Área)",
+    desc: "Volume de tickets por área ou tabulação de atendimento. Mostra quais departamentos ou categorias concentram maior demanda.",
+    insight: "Uma área com volume muito acima das outras pode estar com processo ruim, produto com defeito ou falta de autoatendimento. Compare mês a mês para ver se está crescendo — tabulações em crescimento contínuo indicam problema não resolvido na causa raiz."
+  },
+  "chart-sub-pedidos": {
+    icon: "📦", title: "Submotivos: Pedidos",
+    desc: "Detalhamento dos submotivos dentro da categoria de Pedidos. Revela quais problemas específicos de pedidos geram mais contatos.",
+    insight: "Problemas com pedidos são geralmente resolvíveis na raiz: se 'prazo' ou 'status' dominam, o sistema de rastreamento pode ser melhorado. Se 'cancelamento' é frequente, investigue a jornada de compra. Cada submotivo que some do top 3 representa redução real de volume."
+  },
+  "chart-sub-entrega": {
+    icon: "🚚", title: "Submotivos: Entrega",
+    desc: "Detalhamento dos submotivos dentro da categoria de Ocorrências na Entrega. Revela os problemas mais frequentes na última milha da operação logística.",
+    insight: "Problemas de entrega têm alto impacto na satisfação — o cliente já pagou e está esperando. Se atraso ou endereço errado dominam, há oportunidade de melhoria com a transportadora. Mapeie os submotivos por transportadora ou região para identificar o parceiro ou rota problemática."
+  },
+  "chart-sub-assist": {
+    icon: "🔧", title: "Submotivos: Assistência Técnica",
+    desc: "Detalhamento dos submotivos dentro da categoria de Assistência Técnica. Revela os tipos de problemas técnicos ou de produto mais reportados.",
+    insight: "Alta concentração em um único submotivo de assistência indica defeito sistêmico em um produto ou lote específico. Compartilhe esses dados com a equipe de qualidade — a reclamação que chega no SAC é o sinal mais precoce de problema de produto antes que vire recall ou ação judicial."
+  },
+  "chart-sub-atend": {
+    icon: "💬", title: "Submotivos: Atendimento",
+    desc: "Detalhamento dos submotivos dentro da categoria de Atendimento ao Cliente. Revela os tipos de falhas ou demandas no próprio processo de atendimento.",
+    insight: "Submotivos como 'demora', 'mal atendido' ou 'não resolvido' dentro da categoria de Atendimento indicam falha no próprio processo — não no produto. Esses são os mais críticos porque geram 'duplo contato' (o cliente liga de novo). Cada um resolvido reduz imediatamente o volume total."
+  },
+  "pareto": {
+    icon: "⚖️", title: "Análise de Pareto (80/20)",
+    desc: "Ranking de combinações tabulação + submotivo ordenado por frequência, com acumulado percentual. A lei de Pareto diz que ~20% das causas geram ~80% dos problemas.",
+    insight: "Resolva os 3 primeiros itens deste pareto e você provavelmente eliminará 40–50% de todo o volume de tickets. Essa é a forma mais eficiente de reduzir operação: não otimize o processo de atendimento, corrija a causa raiz dos problemas mais frequentes antes de tudo."
+  },
+  "pareto-list": {
+    icon: "⚖️", title: "Pareto — Tabulação + Submotivo",
+    desc: "Lista ranqueada das combinações mais frequentes de tabulação e submotivo. Cada linha representa uma combinação de área + problema específico.",
+    insight: "Concentre os esforços de melhoria de processo nas primeiras linhas desta lista. Se os top 5 itens representam mais de 50% do volume total, você tem um problema altamente concentrado — isso é bom, porque significa que poucos esforços de correção geram grande impacto."
+  },
+  "chart-motivo-month": {
+    icon: "📅", title: "Motivos por Mês",
+    desc: "Evolução mensal dos motivos de contato. Mostra como a composição das demandas muda ao longo do tempo — se reclamações estão crescendo, se informações estão caindo etc.",
+    insight: "Um motivo crescendo consistentemente mês a mês é sinal vermelho — indica um problema que não está sendo resolvido na causa raiz. Um motivo caindo mês a mês é sinal de que alguma melhoria de processo ou autoatendimento está funcionando. Identifique o que causou cada tendência."
+  },
+  "chart-tab-month": {
+    icon: "📅", title: "Tabulação por Mês",
+    desc: "Evolução mensal das tabulações (áreas de atendimento). Mostra quais áreas estão ganhando ou perdendo volume ao longo do tempo.",
+    insight: "Se uma área específica está crescendo de forma isolada, investigue o que mudou nela: novo produto lançado, mudança de processo, falha sistêmica recorrente. Tabulações em queda geralmente indicam melhoria efetiva ou redirecionamento para autoatendimento."
+  },
+  "heatmap-vol": {
+    icon: "🔥", title: "Heatmap: Volume por Hora x Dia",
+    desc: "Mapa de calor que cruza os dias da semana com as horas do dia para mostrar onde se concentra o maior volume de tickets. Cores mais quentes = maior concentração.",
+    insight: "Este é o mapa de dimensionamento ideal para a equipe. As células mais quentes são os horários que precisam de mais agentes online. Se há célula muito quente com SLA ruim naquele horário (cruze com o heatmap de PR), você encontrou o ponto crítico que mais impacta a satisfação do cliente."
+  },
+  "heatmap-pr": {
+    icon: "⏱️", title: "Heatmap: PR Médio por Hora x Dia",
+    desc: "Mapa de calor que mostra o tempo médio de primeira resposta para cada combinação de dia da semana e hora do dia. Células mais quentes = atendimento mais lento.",
+    insight: "Compare com o heatmap de volume: se uma célula tem alto volume E alto PR, esse é o seu gargalo crítico — mais tickets chegando do que a equipe consegue responder. Reforce a cobertura nesse horário específico antes de qualquer outra melhoria de processo."
+  },
+  "chart-hour-vol": {
+    icon: "🕐", title: "Volume por Hora do Dia",
+    desc: "Distribuição dos tickets ao longo das horas do dia. Revela o perfil de demanda horária da operação, independente do dia da semana.",
+    insight: "O pico de volume geralmente acontece 1–2 horas após a abertura do negócio e próximo ao fechamento. Garantir escala máxima nesses dois momentos do dia costuma resolver 60–70% dos problemas de SLA sem necessidade de contratar mais pessoas."
+  },
+  "chart-hour-fr": {
+    icon: "⚡", title: "PR Médio por Hora",
+    desc: "Tempo médio de primeira resposta segmentado por hora do dia. Mostra em quais horários o atendimento é mais ágil ou mais lento.",
+    insight: "Horários com PR alto geralmente coincidem com transição de turno (almoço, troca de equipe) ou início do dia quando há acúmulo de tickets da madrugada. Automatize respostas iniciais nesses horários ou garanta cobertura na transição de turno para evitar que tickets fiquem sem resposta entre turnos."
+  },
+  "top-clients": {
+    icon: "👥", title: "Top 10 Clientes Recorrentes",
+    desc: "Lista dos clientes que abriram mais tickets no período, com os motivos principais de contato. Clientes que precisam acionar o suporte repetidamente podem estar enfrentando problemas não resolvidos.",
+    insight: "Alta reincidência de um cliente específico é sinal de problema não resolvido na causa raiz ou produto com defeito. Considere uma abordagem proativa: contate esses clientes antes que eles entrem em contato. Uma ligação proativa para o top 10 pode virar o cliente mais frustrado no seu maior promotor."
+  },
+};
+
+// KPI info IDs
+const KPI_INFO = {
+  "kpi-total":        { icon: "🎫", title: "Total de Tickets", desc: "Número total de tickets recebidos no período filtrado. É o indicador base de volume da operação.", insight: "Analise sempre em relação ao número de dias ativos. Um volume crescente sem aumento de equipe deteriora todos os outros indicadores. Estabeleça uma baseline do volume 'normal' para identificar desvios rapidamente." },
+  "kpi-closed-pct":   { icon: "✅", title: "Taxa de Fechamento", desc: "Percentual de tickets encerrados (Fechado + Resolvido) em relação ao total. Indica a capacidade do time de resolver o que chega.", insight: "Abaixo de 85% indica acúmulo de backlog. Acima de 99% pode indicar fechamentos prematuros sem resolução real — verifique a taxa de reabertura. O ideal é manter entre 88–96% com monitoramento de reabertura." },
+  "kpi-daily-avg":    { icon: "📅", title: "Média Diária de Tickets", desc: "Quantidade média de tickets recebidos por dia ativo no período. É o principal indicador para dimensionamento da equipe.", insight: "Use esse número para calcular quantos agentes são necessários: divida pela capacidade de atendimento individual (geralmente 30–50 tickets/dia por agente em canais de texto). Se a média subir 15% ou mais, é hora de revisar o headcount." },
+  "kpi-fr-avg":       { icon: "⏱️", title: "1ª Resposta Média (PR)", desc: "Tempo médio em minutos entre a abertura do ticket e a primeira resposta de um agente. É o indicador de velocidade mais percebido pelo cliente.", insight: "Abaixo de 5 min = excelente. 5–15 min = bom. 15–30 min = atenção. Acima de 30 min = crítico. O PR impacta diretamente o CSAT — clientes que recebem resposta rápida avaliam melhor o atendimento mesmo quando o problema demora a ser resolvido." },
+  "kpi-tr-avg":       { icon: "🔄", title: "Tempo Médio de Resolução", desc: "Tempo médio em minutos do ciclo completo do ticket — desde a abertura até o fechamento definitivo. Mede a eficiência total do processo de atendimento.", insight: "Compare com benchmarks do seu setor. Um TR muito alto pode indicar falta de autonomia dos agentes, dependência de outras áreas, ou processos de aprovação lentos. Mapeie os tickets com TR acima de 2x a média para encontrar os gargalos." },
+  "kpi-clients":      { icon: "👥", title: "Clientes Únicos", desc: "Número de clientes distintos que abriram pelo menos um ticket no período. Indica a amplitude do atendimento em termos de base de clientes.", insight: "Compare com o tamanho total da base de clientes para calcular a taxa de contato. Uma taxa de contato muito alta (>15%) pode indicar um produto ou processo com problemas estruturais gerando demanda de suporte excessiva." },
+  "kpi-recurrent-pct":{ icon: "🔁", title: "Taxa de Reincidência", desc: "Percentual de clientes que abriram mais de um ticket no período. Alta reincidência indica que os problemas não estão sendo resolvidos de forma definitiva.", insight: "Acima de 20% de reincidência é crítico — 1 em cada 5 clientes está voltando com problemas. Isso infla o volume total artificialmente. Resolva as causas raízes dos clientes reincidentes e o volume total cairá proporcionalmente sem aumento de demanda nova." },
+  "kpi-sla5":         { icon: "🏆", title: "SLA PR ≤ 5 minutos", desc: "Percentual de tickets respondidos em até 5 minutos após a abertura. É o indicador de excelência no tempo de primeira resposta.", insight: "Este é o indicador de 'percepção de serviço premium'. Acima de 70% = excelente experiência percebida. Abaixo de 40% = experiência mediana. Para elevar este número, priorize automações de triagem, templates de primeira resposta e garantia de cobertura nos horários de pico." },
+  "sla-fr-avg":       { icon: "⚡", title: "PR Médio (min)", desc: "Média aritmética do tempo de primeira resposta em minutos. Indica o tempo típico que um cliente aguarda antes de receber a primeira interação do time.", insight: "Atenção: a média é sensível a outliers. Um ticket que ficou 8 horas sem resposta pode elevar a média de todo o time. Compare com a mediana para ter uma leitura mais fiel da performance real do dia a dia." },
+  "sla-fr-med":       { icon: "📍", title: "PR Mediana (min)", desc: "O valor do meio da distribuição de tempos de primeira resposta. Metade dos tickets foi respondida mais rápido que esse valor, metade mais devagar.", insight: "A mediana é a métrica mais honesta para avaliar a PR real. Se ela for muito menor que a média, significa que alguns tickets com atraso extremo estão inflando a média. Esses outliers merecem investigação específica." },
+  "sla-tr-avg":       { icon: "⏳", title: "Tempo Médio de Resolução (min)", desc: "Média do tempo total para resolver um ticket, da abertura ao fechamento.", insight: "Para tickets simples (informações, rastreio), o TR deve ser inferior a 60 minutos. Para processos complexos, até 24 horas é razoável. Estabeleça SLAs diferenciados por tipo de demanda para ter metas realistas e mensuráveis." },
+  "sla-tr-med":       { icon: "📍", title: "TR Mediana (min)", desc: "Valor mediano do tempo de resolução. Metade dos tickets foi resolvida mais rapidamente que esse número.", insight: "Use a mediana como meta primária de SLA — ela reflete melhor o que a maioria dos clientes experimenta. A meta de SLA deve ser definida como 'X% dos tickets resolvidos em Y minutos', onde Y é próximo da mediana histórica + 20% de margem." },
+  "sla-tr-4h":        { icon: "⚡", title: "% Resolvidos em ≤ 4 horas", desc: "Percentual de tickets totalmente resolvidos em até 4 horas. É uma meta comum de SLA para atendimento por chat/mensagem.", insight: "Abaixo de 60% em ≤4h indica processo de resolução lento. Identifique quais categorias de ticket superam esse limite — geralmente são os mesmos tipos. Um playbook de resolução para os top 5 motivos pode elevar esse percentual significativamente." },
+  "sla-ar-avg":       { icon: "🏁", title: "Tempo Atribuição → Resolução (min)", desc: "Tempo médio entre o momento em que o ticket foi atribuído a um agente e o momento do fechamento. Mede a eficiência do agente após receber o ticket.", insight: "Diferente do TR total, este indicador exclui o tempo de fila. Se for alto, indica que os agentes estão lentos após receberem os tickets — pode ser falta de informação, processos internos burocráticos ou necessidade de treinamento." },
+};
+
+function showChartInfo(id) {
+  const info = CHART_INFO[id] || KPI_INFO[id];
+  if (!info) return;
+  const overlay = document.getElementById("info-overlay");
+  document.getElementById("info-modal-icon").textContent    = info.icon;
+  document.getElementById("info-modal-title").textContent   = info.title;
+  document.getElementById("info-modal-desc").textContent    = info.desc;
+  document.getElementById("info-modal-insight").textContent = info.insight;
+  overlay.style.display = "flex";
+  document.body.style.overflow = "hidden";
+}
+
+function closeInfoModal() {
+  document.getElementById("info-overlay").style.display = "none";
+  document.body.style.overflow = "";
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeInfoModal();
+});
+
+// Inject info buttons into all [data-info-id] elements on DOM ready
+function initInfoButtons() {
+  // Chart titles
+  document.querySelectorAll("[data-info-id]").forEach(el => {
+    const id = el.getAttribute("data-info-id");
+    if (!id) return;
+    const info = CHART_INFO[id] || KPI_INFO[id];
+    if (!info) return;
+    const btn = document.createElement("button");
+    btn.className = el.classList.contains("chart-title") ? "info-btn" : "info-btn";
+    btn.innerHTML = "ℹ";
+    btn.title = "Saiba mais";
+    btn.onclick = (e) => { e.stopPropagation(); showChartInfo(id); };
+    el.appendChild(btn);
+  });
+  // KPI cards — add button to each card that has an ID we know about
+  Object.keys(KPI_INFO).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const card = el.closest(".kpi-card");
+    if (!card || card.querySelector(".kpi-info-btn")) return;
+    const btn = document.createElement("button");
+    btn.className = "kpi-info-btn";
+    btn.innerHTML = "ℹ";
+    btn.title = "Saiba mais";
+    btn.onclick = (e) => { e.stopPropagation(); showChartInfo(id); };
+    card.appendChild(btn);
+  });
+}
+
+// ============================================================
+// DOUGHNUT WITH CUSTOM HTML LEGEND
+// ============================================================
+function makeDoughnutChart(canvasId, labels, values, colors, cutout = "68%") {
+  // Sort by value descending for cleaner legend
+  const combined = labels.map((l, i) => ({ l, v: values[i], c: colors[i % colors.length] }))
+                         .sort((a, b) => b.v - a.v);
+  const sortedLabels  = combined.map(x => x.l);
+  const sortedValues  = combined.map(x => x.v);
+  const sortedColors  = combined.map(x => x.c);
+
+  const legendEl = document.getElementById("legend-" + canvasId);
+  const total    = sortedValues.reduce((a, b) => a + b, 0);
+
+  makeChart(canvasId, {
+    type: "doughnut",
+    data: {
+      labels: sortedLabels,
+      datasets: [{ data: sortedValues, backgroundColor: sortedColors, borderWidth: 0, hoverOffset: 6 }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1e2840", titleColor: "#e2e8f0",
+          bodyColor: "#94a3b8", borderColor: "#263050", borderWidth: 1,
+          callbacks: {
+            label: (ctx) => {
+              const pct = total ? Math.round((ctx.parsed / total) * 100) : 0;
+              return ` ${ctx.label}: ${ctx.parsed.toLocaleString("pt-BR")} (${pct}%)`;
+            }
+          }
+        },
+        datalabels: { display: false }, // handled by custom HTML legend
+      },
+    },
+  });
+
+  if (legendEl) {
+    legendEl.innerHTML = sortedLabels.map((label, i) => {
+      const pct = total ? Math.round((sortedValues[i] / total) * 100) : 0;
+      return `<div class="donut-legend-item">
+        <div class="donut-legend-dot" style="background:${sortedColors[i]}"></div>
+        <span class="donut-legend-label">${label}</span>
+        <span class="donut-legend-count">${sortedValues[i].toLocaleString("pt-BR")}</span>
+        <span class="donut-legend-pct" style="color:${sortedColors[i]}">${pct}%</span>
+      </div>`;
+    }).join("");
+  }
+}
+
 // Charts registry
 const CHARTS = {};
 let showLabels = false;
@@ -84,32 +440,81 @@ function toggleLabels() {
 function injectDatalabels(cfg) {
   if (!cfg.options) cfg.options = {};
   if (!cfg.options.plugins) cfg.options.plugins = {};
+
+  // If the chart already has a custom datalabels config (e.g. presentation slides
+  // with display:true always), preserve it — just update the font weight.
+  if (cfg.options.plugins.datalabels && cfg.options.plugins.datalabels._preserve) {
+    return;
+  }
+  if (cfg.options.plugins.datalabels && cfg.options.plugins.datalabels.display === true) {
+    // Custom config: keep it, only normalise font weight
+    cfg.options.plugins.datalabels.font = cfg.options.plugins.datalabels.font || {};
+    cfg.options.plugins.datalabels.font.weight = "normal";
+    return;
+  }
+
   const isDoughnut = cfg.type === "doughnut" || cfg.type === "pie";
-  const isLine = cfg.type === "line";
-  cfg.options.plugins.datalabels = {
-    display: showLabels,
-    color: "#e2e8f0",
-    font: { family: "DM Sans", size: 11, weight: "400" },
-    formatter: (value) => {
-      if (value === 0 || value == null) return null;
-      if (typeof value === "number") {
-        if (value >= 1000) return (value / 1000).toFixed(1) + "k";
-        return Math.round(value);
-      }
-      return value;
-    },
-    anchor: isDoughnut ? "center" : cfg.options.indexAxis === "y" ? "end" : "end",
-    align:  isDoughnut ? "center" : cfg.options.indexAxis === "y" ? "right" : "top",
-    offset: isDoughnut ? 0 : isLine ? 8 : 6,
-    clamp: true, clip: false, padding: 0,
-    backgroundColor: null, borderRadius: 0,
+  const isLine     = cfg.type === "line";
+  const isHBar     = cfg.options.indexAxis === "y";
+
+  // Formatter: percentage for doughnuts (hide tiny slices via null), number for others
+  const fmt_val = (value, ctx) => {
+    if (value === 0 || value == null) return null;
+    if (isDoughnut) {
+      const data  = ctx.chart.data.datasets[0].data;
+      const total = data.reduce((a, b) => (a || 0) + (b || 0), 0);
+      if (!total) return null;
+      const slice = value / total;
+      if (slice < 0.015) return null; // hide slices < 1.5%
+      return Math.round(slice * 100) + "%";
+    }
+    if (typeof value === "number") {
+      if (value >= 1000) return (value / 1000).toFixed(1) + "k";
+      return Math.round(value);
+    }
+    return value;
   };
+
+  cfg.options.plugins.datalabels = {
+    display   : showLabels,
+    color     : "#e2e8f0",
+    font      : { family: "DM Sans", size: 11, weight: "normal" },
+    formatter : fmt_val,
+    // hbar: anchor="end" ancora na ponta direita da barra
+    // align=0 → 0 graus = direção absoluta direita, independente da orientação do eixo
+    // Isso garante que o rótulo fique à direita da barra, centralizado verticalmente
+    anchor    : isDoughnut ? "end" : "end",
+    align     : isDoughnut ? "end" : isHBar ? 0 : "top",
+    offset    : isDoughnut ? 18    : isHBar  ? 4 : isLine ? 8 : 4,
+    clamp     : true,
+    clip      : false,
+    padding   : { top: 0, bottom: 0, left: 2, right: 2 },
+  };
+
+  // Always add layout padding so chart size is stable (doesn't jump on toggle)
+  if (!cfg.options.layout) cfg.options.layout = {};
+  if (!cfg.options.layout.padding) cfg.options.layout.padding = {};
+  const pad = cfg.options.layout.padding;
+  if (isDoughnut) {
+    if (pad.top    == null) pad.top    = 28;
+    if (pad.right  == null) pad.right  = 28;
+    if (pad.bottom == null) pad.bottom = 28;
+    if (pad.left   == null) pad.left   = 28;
+  } else {
+    if (pad.top    == null) pad.top    = isHBar ? 6  : 28;
+    if (pad.right  == null) pad.right  = isHBar ? 44 : 16;
+    if (pad.bottom == null) pad.bottom = 4;
+  }
 }
 
 function makeChart(id, cfg) {
   if (CHARTS[id]) CHARTS[id].destroy();
   const ctx = document.getElementById(id);
   if (!ctx) return;
+  // Replace empty/null labels with "(Sem info)"
+  if (cfg.data && Array.isArray(cfg.data.labels)) {
+    cfg.data.labels = cfg.data.labels.map(lblOrNA);
+  }
   injectDatalabels(cfg);
   CHARTS[id] = new Chart(ctx, cfg);
   return CHARTS[id];
@@ -120,7 +525,7 @@ const baseChartOpts = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      labels: { color: "#94a3b8", font: { family: "DM Sans", size: 11 } },
+      labels: { color: "#e2e8f0", font: { family: "DM Sans", size: 11 } },
     },
     tooltip: {
       backgroundColor: "#1e2840",
@@ -132,12 +537,14 @@ const baseChartOpts = {
   },
   scales: {
     x: {
-      ticks: { color: "#64748b", font: { size: 10 } },
+      ticks: { color: "#e2e8f0", font: { size: 10 } },
       grid: { color: "rgba(38,48,80,0.5)" },
+      grace: "10%",
     },
     y: {
-      ticks: { color: "#64748b", font: { size: 10 } },
+      ticks: { color: "#e2e8f0", font: { size: 10 } },
       grid: { color: "rgba(38,48,80,0.5)" },
+      grace: "15%",
     },
   },
 };
@@ -271,7 +678,7 @@ function renderAll() {
 // ============================================================
 function renderExecutive(d) {
   const total = d.length;
-  const closed = d.filter((r) => r.st === "Closed" || r.st === "Solved").length;
+  const closed = d.filter((r) => r.st === "Closed" || r.st === "Solved" || r.st === "Fechado" || r.st === "Resolvido").length;
   const frVals = d.map((r) => r.fr).filter((v) => v != null);
   const trVals = d.map((r) => r.tr).filter((v) => v != null);
   const clients = new Set(d.map((r) => r.ci));
@@ -292,7 +699,7 @@ function renderExecutive(d) {
   document.getElementById("kpi-closed-pct").textContent =
     pct(closed, total) + "%";
   document.getElementById("kpi-closed-sub").textContent =
-    `${closed} fechados / ${total - closed} abertos`;
+    `${closed} fechados · ${total - closed} abertos`;
   document.getElementById("kpi-daily-avg").textContent = dailyAvg.toFixed(1);
   document.getElementById("kpi-fr-avg").textContent = fmt(avg(frVals));
   document.getElementById("kpi-tr-avg").textContent = fmt(avg(trVals));
@@ -339,42 +746,16 @@ function renderExecutive(d) {
     },
   });
 
-  // Chart: status pie
+  // Chart: status donut
   const statusCount = {};
   d.forEach((r) => {
-    statusCount[r.st] = (statusCount[r.st] || 0) + 1;
+    const key = translateStatus(r.st);
+    statusCount[key] = (statusCount[key] || 0) + 1;
   });
-  makeChart("chart-status", {
-    type: "doughnut",
-    data: {
-      labels: Object.keys(statusCount),
-      datasets: [
-        {
-          data: Object.values(statusCount),
-          backgroundColor: ["#10b981", "#00d4ff", "#f59e0b"],
-          borderWidth: 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "65%",
-      plugins: {
-        legend: {
-          labels: { color: "#94a3b8", font: { size: 11 } },
-          position: "bottom",
-        },
-        tooltip: {
-          backgroundColor: "#1e2840",
-          titleColor: "#e2e8f0",
-          bodyColor: "#94a3b8",
-          borderColor: "#263050",
-          borderWidth: 1,
-        },
-      },
-    },
-  });
+  const STATUS_COLORS = { "Fechado": "#10b981", "Resolvido": "#00d4ff", "Aberto": "#f59e0b", "Pendente": "#a855f7", "Em Espera": "#f97316", "Novo": "#ef4444" };
+  const stLabels = Object.keys(statusCount);
+  const stColors = stLabels.map((l, i) => STATUS_COLORS[l] || COLORS[i % COLORS.length]);
+  makeDoughnutChart("chart-status", stLabels, Object.values(statusCount), stColors, "68%");
 
   // Chart: month bar
   const monthCount = {};
@@ -425,42 +806,11 @@ function renderExecutive(d) {
     },
   });
 
-  // Chart: motivo pie
+  // Chart: motivo donut
   const motivoCount = {};
-  d.forEach((r) => {
-    motivoCount[r.mt] = (motivoCount[r.mt] || 0) + 1;
-  });
-  makeChart("chart-motivo-pie", {
-    type: "doughnut",
-    data: {
-      labels: Object.keys(motivoCount),
-      datasets: [
-        {
-          data: Object.values(motivoCount),
-          backgroundColor: ["#00d4ff", "#7c3aed", "#ef4444"],
-          borderWidth: 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "60%",
-      plugins: {
-        legend: {
-          labels: { color: "#94a3b8", font: { size: 11 } },
-          position: "bottom",
-        },
-        tooltip: {
-          backgroundColor: "#1e2840",
-          titleColor: "#e2e8f0",
-          bodyColor: "#94a3b8",
-          borderColor: "#263050",
-          borderWidth: 1,
-        },
-      },
-    },
-  });
+  d.forEach((r) => { if (r.mt) motivoCount[r.mt] = (motivoCount[r.mt] || 0) + 1; });
+  const mColors = ["#00d4ff", "#7c3aed", "#ef4444", "#f59e0b", "#10b981", "#f97316"];
+  makeDoughnutChart("chart-motivo-pie", Object.keys(motivoCount), Object.values(motivoCount), mColors, "63%");
 }
 
 // ============================================================
@@ -566,7 +916,7 @@ function renderSLA(d) {
       labels: months,
       datasets: [
         {
-          label: "FR Médio (min)",
+          label: "PR Médio (min)",
           data: mFR,
           borderColor: "#00d4ff",
           backgroundColor: "rgba(0,212,255,0.1)",
@@ -588,12 +938,12 @@ function renderSLA(d) {
       ...baseChartOpts,
       scales: {
         x: {
-          ticks: { color: "#64748b" },
+          ticks: { color: "#e2e8f0" },
           grid: { color: "rgba(38,48,80,0.5)" },
         },
         y: {
           // Usamos Math.round(v) para garantir que o eixo da esquerda não tenha decimais gigantes
-          ticks: { color: "#64748b", callback: (v) => Math.round(v) + "min" },
+          ticks: { color: "#e2e8f0", callback: (v) => Math.round(v) + "min" },
           grid: { color: "rgba(38,48,80,0.5)" },
         },
         y2: {
@@ -624,7 +974,7 @@ function renderSLA(d) {
       labels: DAYS_ORDER.map((d2) => d2.replace("-feira", "")),
       datasets: [
         {
-          label: "FR Médio (min)",
+          label: "PR Médio (min)",
           data: DAYS_ORDER.map((dw) => Math.round(dayFR[dw] || 0)),
           backgroundColor: "#7c3aed",
           borderRadius: 6,
@@ -703,7 +1053,7 @@ function renderTeam(d) {
       labels: agentsSortFR.map((a) => a.name),
       datasets: [
         {
-          label: "FR Médio (min)",
+          label: "PR Médio (min)",
           data: agentsSortFR.map((a) => Math.round(avg(a.fr))),
           backgroundColor: "rgba(0,212,255,0.7)",
           borderRadius: 4,
@@ -1084,7 +1434,7 @@ function renderOperational(d) {
         .map((h) => h + "h"),
       datasets: [
         {
-          label: "FR Médio (min)",
+          label: "PR Médio (min)",
           data: Object.keys(hourFR)
             .sort((a, b) => a - b)
             .map((h) => hourFR[h]),
@@ -1340,7 +1690,7 @@ const PRES_SLIDES = [
   // ── Aba 2: SLA ──────────────────────────────────────────────
   { id: "sla-fr",       label: "⚡ SLA — 1ª Resposta (faixas)",       agentData: false, group: "SLA & Eficiência" },
   { id: "sla-tr",       label: "⏳ SLA — Resolução (faixas)",         agentData: false, group: "SLA & Eficiência" },
-  { id: "sla-trend",    label: "📈 Evolução Mensal FR e TR",           agentData: false, group: "SLA & Eficiência" },
+  { id: "sla-trend",    label: "📈 Evolução Mensal PR e TR",           agentData: false, group: "SLA & Eficiência" },
   { id: "fr-dayofweek", label: "🗓️ FR Médio por Dia da Semana",       agentData: false, group: "SLA & Eficiência" },
   // ── Aba 3: Equipe ───────────────────────────────────────────
   { id: "agents-vol",   label: "🏆 Ranking Agentes — Volume",         agentData: true,  group: "Performance da Equipe" },
@@ -1603,7 +1953,7 @@ const presChartOpts = {
   maintainAspectRatio: false,
   plugins: {
     legend: {
-      labels: { color: "#94a3b8", font: { family: "DM Sans", size: 14 }, padding: 14 },
+      labels: { color: "#e2e8f0", font: { family: "DM Sans", size: 14 }, padding: 14 },
     },
     tooltip: {
       backgroundColor: "#1e2840",
@@ -1616,8 +1966,8 @@ const presChartOpts = {
     },
   },
   scales: {
-    x: { ticks: { color: "#64748b", font: { size: 13 } }, grid: { color: "rgba(38,48,80,0.4)" } },
-    y: { ticks: { color: "#64748b", font: { size: 13 } }, grid: { color: "rgba(38,48,80,0.4)" } },
+    x: { ticks: { color: "#e2e8f0", font: { size: 13 } }, grid: { color: "rgba(38,48,80,0.4)" }, grace: "10%" },
+    y: { ticks: { color: "#e2e8f0", font: { size: 13 } }, grid: { color: "rgba(38,48,80,0.4)" }, grace: "15%" },
   },
 };
 
@@ -1627,10 +1977,14 @@ function makePresChart(id, cfg) {
   if (PRES_CHARTS[id]) { PRES_CHARTS[id].destroy(); delete PRES_CHARTS[id]; }
   const ctx = document.getElementById(id);
   if (!ctx) return;
+  // Replace empty/null labels with "(Sem info)"
+  if (cfg.data && Array.isArray(cfg.data.labels)) {
+    cfg.data.labels = cfg.data.labels.map(lblOrNA);
+  }
   // Inject datalabels respecting showLabels, with larger font for TV
   injectDatalabels(cfg);
   if (cfg.options.plugins.datalabels) {
-    cfg.options.plugins.datalabels.font = { family: "DM Sans", size: 14, weight: "600" };
+    cfg.options.plugins.datalabels.font = { family: "DM Sans", size: 14, weight: "normal" };
   }
   PRES_CHARTS[id] = new Chart(ctx, cfg);
   return PRES_CHARTS[id];
@@ -1661,7 +2015,7 @@ const presSlideRenderers = {
   // 1. KPIs
   kpis(d, el) {
     const total = d.length;
-    const closed = d.filter((r) => r.st === "Closed" || r.st === "Solved").length;
+    const closed = d.filter((r) => r.st === "Closed" || r.st === "Solved" || r.st === "Fechado" || r.st === "Resolvido").length;
     const frVals = d.map((r) => r.fr).filter((v) => v != null);
     const trVals = d.map((r) => r.tr).filter((v) => v != null);
     const clients = new Set(d.map((r) => r.ci)).size;
@@ -1674,12 +2028,12 @@ const presSlideRenderers = {
     const kpis = [
       { icon: "🎫", val: total.toLocaleString("pt-BR"), label: "Total de Tickets",      sub: `${daysSet} dias ativos`,           color: "#00d4ff" },
       { icon: "✅", val: pct(closed, total) + "%",      label: "Taxa de Fechamento",    sub: `${closed} fechados`,               color: "#10b981" },
-      { icon: "⏱️", val: fmt(avg(frVals)),              label: "1ª Resposta Média",     sub: "minutos",                          color: "#7c3aed" },
+      { icon: "⏱️", val: fmt(avg(frVals)),              label: "1ª Resposta (PR)",       sub: "minutos",                          color: "#7c3aed" },
       { icon: "🔄", val: fmt(avg(trVals)),              label: "Resolução Média",       sub: "minutos",                          color: "#ef4444" },
       { icon: "📅", val: daysSet > 0 ? (total / daysSet).toFixed(1) : "—", label: "Média Diária", sub: "tickets/dia",           color: "#f59e0b" },
       { icon: "👥", val: clients.toLocaleString("pt-BR"), label: "Clientes Únicos",    sub: `${recurrent} reincidentes`,        color: "#06b6d4" },
       { icon: "🔁", val: pct(recurrent, clients) + "%", label: "Reincidência",          sub: "clientes c/ +1 ticket",            color: "#f97316" },
-      { icon: "🏆", val: sla5 + "%",                    label: "SLA ≤ 5 min (FR)",     sub: "1ª resposta",                      color: "#a855f7" },
+      { icon: "🏆", val: sla5 + "%",                    label: "SLA PR ≤ 5 min",       sub: "primeira resposta",                color: "#a855f7" },
     ];
 
     const grid = document.createElement("div");
@@ -1721,7 +2075,7 @@ const presSlideRenderers = {
   // 3. Status
   status(d, el) {
     const statusCount = {};
-    d.forEach((r) => { statusCount[r.st] = (statusCount[r.st] || 0) + 1; });
+    d.forEach((r) => { const k = translateStatus(r.st); statusCount[k] = (statusCount[k] || 0) + 1; });
     const wrap = document.createElement("div");
     wrap.className = "pres-chart-wrap";
     wrap.innerHTML = `<canvas id="pres-canvas-status"></canvas>`;
@@ -1736,11 +2090,11 @@ const presSlideRenderers = {
       options: {
         responsive: true, maintainAspectRatio: false, cutout: "60%",
         plugins: {
-          legend: { position: "bottom", labels: { color: "#94a3b8", font: { size: 16 }, padding: 20 } },
+          legend: { position: "bottom", labels: { color: "#e2e8f0", font: { size: 16 }, padding: 20 } },
           tooltip: presChartOpts.plugins.tooltip,
           datalabels: {
             display: true, color: "#fff",
-            font: { family: "Syne", size: 18, weight: "700" },
+            font: { family: "DM Sans", size: 16, weight: "normal" },
             formatter: (v, ctx) => {
               const t = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
               return Math.round((v / t) * 100) + "%";
@@ -2008,7 +2362,7 @@ const presSlideRenderers = {
       type: "bar",
       data: {
         labels,
-        datasets: [{ label: "FR Médio (min)", data: agents.map((a) => Math.round(avg(a.fr))),
+        datasets: [{ label: "PR Médio (min)", data: agents.map((a) => Math.round(avg(a.fr))),
           backgroundColor: "rgba(0,212,255,0.75)", borderRadius: 4, barThickness: 20 }],
       },
       options: {
@@ -2061,11 +2415,11 @@ const presSlideRenderers = {
       options: {
         responsive: true, maintainAspectRatio: false, cutout: "55%",
         plugins: {
-          legend: { position: "bottom", labels: { color: "#94a3b8", font: { size: 16 }, padding: 22 } },
+          legend: { position: "bottom", labels: { color: "#e2e8f0", font: { size: 16 }, padding: 22 } },
           tooltip: presChartOpts.plugins.tooltip,
           datalabels: {
             display: true, color: "#fff",
-            font: { family: "Syne", size: 18, weight: "700" },
+            font: { family: "DM Sans", size: 16, weight: "normal" },
             formatter: (v, ctx) => {
               const t = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
               return Math.round((v / t) * 100) + "%";
@@ -2090,7 +2444,7 @@ const presSlideRenderers = {
       data: {
         labels: months,
         datasets: [
-          { label: "FR Médio (min)", data: mFR, borderColor: "#00d4ff", backgroundColor: "rgba(0,212,255,0.1)", fill: true, tension: 0.4, borderWidth: 3, pointRadius: 6 },
+          { label: "PR Médio (min)", data: mFR, borderColor: "#00d4ff", backgroundColor: "rgba(0,212,255,0.1)", fill: true, tension: 0.4, borderWidth: 3, pointRadius: 6 },
           { label: "TR ÷10 (min)", data: mTR, borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.05)", fill: true, tension: 0.4, borderWidth: 3, pointRadius: 6 },
         ],
       },
@@ -2113,7 +2467,7 @@ const presSlideRenderers = {
       type: "bar",
       data: {
         labels: DAYS_ORDER.map((dw) => dw.replace("-feira", "")),
-        datasets: [{ label: "FR Médio (min)", data: DAYS_ORDER.map((dw) => dayFR[dw]),
+        datasets: [{ label: "PR Médio (min)", data: DAYS_ORDER.map((dw) => dayFR[dw]),
           backgroundColor: "#7c3aed", borderRadius: 8 }],
       },
       options: { ...presChartOpts, plugins: { ...presChartOpts.plugins, legend: { display: false } } },
@@ -2161,7 +2515,7 @@ const presSlideRenderers = {
         <th style="padding:10px 12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);text-align:left">Agente</th>
         <th style="padding:10px 12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);text-align:right">Tickets</th>
         <th style="padding:10px 12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);text-align:right">% Total</th>
-        <th style="padding:10px 12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);text-align:right">FR Médio</th>
+        <th style="padding:10px 12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);text-align:right">PR Médio</th>
         <th style="padding:10px 12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);text-align:right">TR Médio</th>
       </tr></thead><tbody>`;
     agentStats.forEach((a, i) => {
@@ -2390,7 +2744,7 @@ const presSlideRenderers = {
       type: "bar",
       data: {
         labels: HOURS.map((h) => h + "h"),
-        datasets: [{ label: "FR Médio (min)", data: HOURS.map((h) => hourFR[h]),
+        datasets: [{ label: "PR Médio (min)", data: HOURS.map((h) => hourFR[h]),
           backgroundColor: "rgba(245,158,11,0.7)", borderRadius: 6 }],
       },
       options: { ...presChartOpts, plugins: { ...presChartOpts.plugins, legend: { display: false } } },
@@ -2441,3 +2795,6 @@ document.getElementById("empty-state").style.display = "flex";
 document
   .querySelectorAll(".tab-content")
   .forEach((el) => (el.style.display = "none"));
+
+// Initialise info buttons once DOM is ready
+document.addEventListener('DOMContentLoaded', initInfoButtons);

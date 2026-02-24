@@ -71,48 +71,50 @@
     </div>
 
     <div class="filters-bar">
-      <div class="filter-group">
-        <span class="filter-label">Mês</span>
-        <select id="f-month" onchange="applyFilters()">
-          <option value="">Todos</option>
-          <option value="Janeiro">Janeiro</option>
-          <option value="Fevereiro">Fevereiro</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Agente</span>
-        <select id="f-agent" onchange="applyFilters()">
-          <option value="">Todos</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Status</span>
-        <select id="f-status" onchange="applyFilters()">
-          <option value="">Todos</option>
-          <option value="Closed">Closed</option>
-          <option value="Solved">Solved</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Motivo</span>
-        <select id="f-motivo" onchange="applyFilters()">
-          <option value="">Todos</option>
-          <option value="INFORMAÇÃO">INFORMAÇÃO</option>
-          <option value="SOLICITAÇÃO">SOLICITAÇÃO</option>
-          <option value="RECLAMAÇÃO">RECLAMAÇÃO</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Tabulação</span>
-        <select id="f-tab" onchange="applyFilters()">
-          <option value="">Todas</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <span class="filter-label">Dia da Semana</span>
-        <select id="f-day" onchange="applyFilters()">
-          <option value="">Todos</option>
-        </select>
+      <div class="filters-inner">
+        <div class="filter-group">
+          <span class="filter-label">Mês</span>
+          <select id="f-month" onchange="applyFilters()">
+            <option value="">Todos</option>
+            <option value="Janeiro">Janeiro</option>
+            <option value="Fevereiro">Fevereiro</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Agente</span>
+          <select id="f-agent" onchange="applyFilters()">
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Status</span>
+          <select id="f-status" onchange="applyFilters()">
+            <option value="">Todos</option>
+            <option value="Closed">Closed</option>
+            <option value="Solved">Solved</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Motivo</span>
+          <select id="f-motivo" onchange="applyFilters()">
+            <option value="">Todos</option>
+            <option value="INFORMAÇÃO">INFORMAÇÃO</option>
+            <option value="SOLICITAÇÃO">SOLICITAÇÃO</option>
+            <option value="RECLAMAÇÃO">RECLAMAÇÃO</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Tabulação</span>
+          <select id="f-tab" onchange="applyFilters()">
+            <option value="">Todas</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Dia da Semana</span>
+          <select id="f-day" onchange="applyFilters()">
+            <option value="">Todos</option>
+          </select>
+        </div>
       </div>
       <button class="btn-clear" onclick="clearFilters()">✕ Limpar</button>
     </div>
@@ -154,7 +156,7 @@
     <!-- ABA 1: VISÃO EXECUTIVA -->
     <div id="aba1" class="tab-content active">
       <div class="page">
-        <div class="section-title">KPIs Principais</div>
+        <div class="section-title" data-info-id="kpis-exec">KPIs Principais</div>
         <div class="kpi-grid">
           <div class="kpi-card" style="--accent-color: #00d4ff">
             <span class="kpi-icon">🎫</span>
@@ -177,7 +179,7 @@
           <div class="kpi-card" style="--accent-color: #7c3aed">
             <span class="kpi-icon">⏱️</span>
             <div class="kpi-value" id="kpi-fr-avg">—</div>
-            <div class="kpi-label">1ª Resposta Média</div>
+            <div class="kpi-label">1ª Resposta (PR)</div>
             <div class="kpi-sub">minutos</div>
           </div>
           <div class="kpi-card" style="--accent-color: #ef4444">
@@ -201,7 +203,7 @@
           <div class="kpi-card" style="--accent-color: #a855f7">
             <span class="kpi-icon">🏆</span>
             <div class="kpi-value" id="kpi-sla5">—</div>
-            <div class="kpi-label">SLA ≤ 5 min</div>
+            <div class="kpi-label">SLA PR ≤ 5 min</div>
             <div class="kpi-sub">primeira resposta</div>
           </div>
         </div>
@@ -217,21 +219,25 @@
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">📊 Distribuição de Status</div>
-            <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+            <div class="chart-title" data-info-id="chart-status">📊 Distribuição de Status</div>
+            <div class="donut-wrap">
+              <div class="chart-wrap donut-canvas"><canvas id="chart-status"></canvas></div>
+              <div class="donut-legend" id="legend-chart-status"></div>
+            </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">📞 Volume por Mês</div>
+            <div class="chart-title" data-info-id="chart-month">📞 Volume por Mês</div>
             <div class="chart-wrap"><canvas id="chart-month"></canvas></div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">🕐 Volume por Dia da Semana</div>
+            <div class="chart-title" data-info-id="chart-dayofweek">🕐 Volume por Dia da Semana</div>
             <div class="chart-wrap"><canvas id="chart-dayofweek"></canvas></div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">💬 Motivo do Contato</div>
-            <div class="chart-wrap">
-              <canvas id="chart-motivo-pie"></canvas>
+            <div class="chart-title" data-info-id="chart-motivo-pie">💬 Motivo do Contato</div>
+            <div class="donut-wrap">
+              <div class="chart-wrap donut-canvas"><canvas id="chart-motivo-pie"></canvas></div>
+              <div class="donut-legend" id="legend-chart-motivo-pie"></div>
             </div>
           </div>
         </div>
@@ -241,17 +247,17 @@
     <!-- ABA 2: SLA & EFICIÊNCIA -->
     <div id="aba2" class="tab-content">
       <div class="page">
-        <div class="section-title">Tempo de Primeira Resposta</div>
+        <div class="section-title" data-info-id="kpis-pr">Tempo de Primeira Resposta (PR)</div>
         <div class="kpi-grid">
           <div class="kpi-card" style="--accent-color: #00d4ff">
             <span class="kpi-icon">⚡</span>
             <div class="kpi-value" id="sla-fr-avg">—</div>
-            <div class="kpi-label">Média FR (min)</div>
+            <div class="kpi-label">PR Médio (min)</div>
           </div>
           <div class="kpi-card" style="--accent-color: #10b981">
             <span class="kpi-icon">📍</span>
             <div class="kpi-value" id="sla-fr-med">—</div>
-            <div class="kpi-label">Mediana FR (min)</div>
+            <div class="kpi-label">PR Mediana (min)</div>
           </div>
           <div class="kpi-card" style="--accent-color: #f59e0b">
             <span class="kpi-icon">🎯</span>
@@ -265,7 +271,7 @@
           </div>
         </div>
 
-        <div class="section-title">Faixas de Primeira Resposta</div>
+        <div class="section-title" data-info-id="faixas-pr">Faixas de Primeira Resposta</div>
         <div class="sla-faixas">
           <div class="sla-faixa">
             <div class="faixa-val" id="fr-faixa-0-5" style="color: #10b981">
@@ -295,11 +301,11 @@
 
         <div class="charts-grid" style="margin-top: 16px">
           <div class="chart-card">
-            <div class="chart-title">⚡ Distribuição 1ª Resposta (faixas)</div>
+            <div class="chart-title" data-info-id="chart-fr-dist">⚡ Distribuição 1ª Resposta / PR (faixas)</div>
             <div class="chart-wrap"><canvas id="chart-fr-dist"></canvas></div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">
+            <div class="chart-title" data-info-id="chart-tr-dist">
               🔄 Distribuição Resolução Total (faixas)
             </div>
             <div class="chart-wrap"><canvas id="chart-tr-dist"></canvas></div>
@@ -334,11 +340,11 @@
 
         <div class="charts-grid">
           <div class="chart-card">
-            <div class="chart-title">📈 Evolução Mensal: FR e TR Médio</div>
+            <div class="chart-title" data-info-id="chart-sla-trend">📈 Evolução Mensal: PR e TR Médio</div>
             <div class="chart-wrap"><canvas id="chart-sla-trend"></canvas></div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">🗓️ FR Médio por Dia da Semana</div>
+            <div class="chart-title" data-info-id="chart-fr-dayofweek">🗓️ PR Médio por Dia da Semana</div>
             <div class="chart-wrap">
               <canvas id="chart-fr-dayofweek"></canvas>
             </div>
@@ -350,24 +356,24 @@
     <!-- ABA 3: PERFORMANCE DA EQUIPE -->
     <div id="aba3" class="tab-content">
       <div class="page">
-        <div class="section-title">Ranking de Agentes</div>
+        <div class="section-title" data-info-id="ranking-agentes">Ranking de Agentes</div>
         <div class="chart-card">
-          <div class="chart-title">🏆 Volume por Agente</div>
+          <div class="chart-title" data-info-id="chart-agent-vol">🏆 Volume por Agente</div>
           <div class="chart-wrap tall">
             <canvas id="chart-agent-vol"></canvas>
           </div>
         </div>
         <div class="charts-grid" style="margin-top: 16px">
           <div class="chart-card">
-            <div class="chart-title">
-              ⚡ Tempo Médio 1ª Resposta por Agente (min)
+            <div class="chart-title" data-info-id="chart-agent-fr">
+              ⚡ PR Médio por Agente (min)
             </div>
             <div class="chart-wrap tall">
               <canvas id="chart-agent-fr"></canvas>
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">
+            <div class="chart-title" data-info-id="chart-agent-tr">
               ⏳ Tempo Médio de Resolução por Agente (min)
             </div>
             <div class="chart-wrap tall">
@@ -376,7 +382,7 @@
           </div>
         </div>
 
-        <div class="section-title">Tabela Detalhada de Agentes</div>
+        <div class="section-title" data-info-id="agent-table">Tabela Detalhada de Agentes</div>
         <div class="chart-card">
           <div class="table-wrap">
             <table>
@@ -386,9 +392,9 @@
                   <th onclick="sortTable('agent-table', 1)">Agente ⇅</th>
                   <th onclick="sortTable('agent-table', 2)">Tickets ⇅</th>
                   <th onclick="sortTable('agent-table', 3)">% Total ⇅</th>
-                  <th onclick="sortTable('agent-table', 4)">FR Médio ⇅</th>
+                  <th onclick="sortTable('agent-table', 4)">PR Médio ⇅</th>
                   <th onclick="sortTable('agent-table', 5)">TR Médio ⇅</th>
-                  <th onclick="sortTable('agent-table', 6)">FR Mediana ⇅</th>
+                  <th onclick="sortTable('agent-table', 6)">PR Mediana ⇅</th>
                   <th onclick="sortTable('agent-table', 7)">TR Mediana ⇅</th>
                 </tr>
               </thead>
@@ -402,57 +408,57 @@
     <!-- ABA 4: MOTIVOS & CAUSAS -->
     <div id="aba4" class="tab-content">
       <div class="page">
-        <div class="section-title">Distribuição de Motivos</div>
+        <div class="section-title" data-info-id="dist-motivos">Distribuição de Motivos</div>
         <div class="charts-grid">
           <div class="chart-card">
-            <div class="chart-title">📊 Motivo do Contato</div>
+            <div class="chart-title" data-info-id="chart-motivo-bar">📊 Motivo do Contato</div>
             <div class="chart-wrap">
               <canvas id="chart-motivo-bar"></canvas>
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">🗂️ Tabulação (Área)</div>
+            <div class="chart-title" data-info-id="chart-tab-bar">🗂️ Tabulação (Área)</div>
             <div class="chart-wrap"><canvas id="chart-tab-bar"></canvas></div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">📦 Submotivos: Pedidos</div>
+            <div class="chart-title" data-info-id="chart-sub-pedidos">📦 Submotivos: Pedidos</div>
             <div class="chart-wrap">
               <canvas id="chart-sub-pedidos"></canvas>
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">🚚 Submotivos: Ocorrência na Entrega</div>
+            <div class="chart-title" data-info-id="chart-sub-entrega">🚚 Submotivos: Ocorrência na Entrega</div>
             <div class="chart-wrap">
               <canvas id="chart-sub-entrega"></canvas>
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">🔧 Submotivos: Assistência Técnica</div>
+            <div class="chart-title" data-info-id="chart-sub-assist">🔧 Submotivos: Assistência Técnica</div>
             <div class="chart-wrap">
               <canvas id="chart-sub-assist"></canvas>
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">💬 Submotivos: Atendimento</div>
+            <div class="chart-title" data-info-id="chart-sub-atend">💬 Submotivos: Atendimento</div>
             <div class="chart-wrap"><canvas id="chart-sub-atend"></canvas></div>
           </div>
         </div>
 
-        <div class="section-title">Análise de Pareto (80/20)</div>
+        <div class="section-title" data-info-id="pareto">Análise de Pareto (80/20)</div>
         <div class="chart-card">
-          <div class="chart-title">⚖️ Pareto — Tabulação + Submotivo</div>
+          <div class="chart-title" data-info-id="pareto-list">⚖️ Pareto — Tabulação + Submotivo</div>
           <div id="pareto-list"></div>
         </div>
 
         <div class="charts-grid" style="margin-top: 16px">
           <div class="chart-card">
-            <div class="chart-title">📅 Motivos por Mês</div>
+            <div class="chart-title" data-info-id="chart-motivo-month">📅 Motivos por Mês</div>
             <div class="chart-wrap">
               <canvas id="chart-motivo-month"></canvas>
             </div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">📅 Tabulação por Mês</div>
+            <div class="chart-title" data-info-id="chart-tab-month">📅 Tabulação por Mês</div>
             <div class="chart-wrap"><canvas id="chart-tab-month"></canvas></div>
           </div>
         </div>
@@ -462,14 +468,14 @@
     <!-- ABA 5: ANÁLISE OPERACIONAL -->
     <div id="aba5" class="tab-content">
       <div class="page">
-        <div class="section-title">
+        <div class="section-title" data-info-id="heatmap-vol">
           Heatmap: Volume por Hora x Dia da Semana
         </div>
         <div class="chart-card">
           <div id="heatmap-volume"></div>
         </div>
 
-        <div class="section-title" style="margin-top: 16px">
+        <div class="section-title" data-info-id="heatmap-pr" style="margin-top: 16px">
           Heatmap: Tempo Médio 1ª Resposta por Hora x Dia
         </div>
         <div class="chart-card">
@@ -478,16 +484,16 @@
 
         <div class="charts-grid" style="margin-top: 16px">
           <div class="chart-card">
-            <div class="chart-title">🕐 Volume por Hora do Dia</div>
+            <div class="chart-title" data-info-id="chart-hour-vol">🕐 Volume por Hora do Dia</div>
             <div class="chart-wrap"><canvas id="chart-hour-vol"></canvas></div>
           </div>
           <div class="chart-card">
-            <div class="chart-title">⚡ FR Médio por Hora</div>
+            <div class="chart-title" data-info-id="chart-hour-fr">⚡ PR Médio por Hora</div>
             <div class="chart-wrap"><canvas id="chart-hour-fr"></canvas></div>
           </div>
         </div>
 
-        <div class="section-title">Top 10 Clientes Recorrentes</div>
+        <div class="section-title" data-info-id="top-clients">Top 10 Clientes Recorrentes</div>
         <div class="chart-card">
           <div class="table-wrap">
             <table>
@@ -593,6 +599,24 @@
 
     </div><!-- /pres-overlay -->
 
+
+    <!-- INFO MODAL -->
+    <div id="info-overlay" class="info-overlay" onclick="closeInfoModal()" style="display:none">
+      <div class="info-modal" onclick="event.stopPropagation()">
+        <button class="info-modal-close" onclick="closeInfoModal()">✕</button>
+        <div class="info-modal-icon" id="info-modal-icon">📊</div>
+        <h3 class="info-modal-title" id="info-modal-title">—</h3>
+        <div class="info-modal-section">
+          <div class="info-modal-section-label">O que é</div>
+          <p class="info-modal-desc" id="info-modal-desc">—</p>
+        </div>
+        <div class="info-modal-divider"></div>
+        <div class="info-modal-section">
+          <div class="info-modal-section-label">💡 Insight</div>
+          <p class="info-modal-insight" id="info-modal-insight">—</p>
+        </div>
+      </div>
+    </div>
     <script src="dashboard.js"></script>
   </body>
 </html>
