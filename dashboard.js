@@ -36,6 +36,35 @@ Chart.register({
   },
 });
 
+// ── Plugin: rótulos de barras horizontais desenhados direto no canvas ──
+// Garante textBaseline="middle" = alinhamento vertical perfeito com a barra.
+Chart.register({
+  id: "hbarLabels",
+  afterDatasetsDraw(chart) {
+    if (!showLabels) return;
+    if (chart.options?.indexAxis !== "y") return;
+    const ctx = chart.ctx;
+    chart.data.datasets.forEach((dataset, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden) return;
+      meta.data.forEach((bar, i) => {
+        const value = dataset.data[i];
+        if (value === 0 || value == null) return;
+        const label = value >= 1000
+          ? (value / 1000).toFixed(1) + "k"
+          : String(Math.round(value));
+        ctx.save();
+        ctx.fillStyle    = "#e2e8f0";
+        ctx.font         = "11px 'DM Sans', sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.textAlign    = "left";
+        ctx.fillText(label, bar.x + 6, bar.y);
+        ctx.restore();
+      });
+    });
+  },
+});
+
 let RAW_DATA = [];
 
 // ============================================================
@@ -476,19 +505,17 @@ function injectDatalabels(cfg) {
   };
 
   cfg.options.plugins.datalabels = {
-    display   : showLabels,
+    display   : isHBar ? false : showLabels,  // hbars: desenhado pelo plugin hbarLabels
     color     : "#e2e8f0",
     font      : { family: "DM Sans", size: 11, weight: "normal" },
     formatter : fmt_val,
-    // hbar: anchor="end" ancora na ponta direita da barra
-    // align=0 → 0 graus = direção absoluta direita, independente da orientação do eixo
-    // Isso garante que o rótulo fique à direita da barra, centralizado verticalmente
+    // hbar: anchor=end places label at bar tip; align=end pushes it outside (right)
     anchor    : isDoughnut ? "end" : "end",
-    align     : isDoughnut ? "end" : isHBar ? 0 : "top",
-    offset    : isDoughnut ? 18    : isHBar  ? 4 : isLine ? 8 : 4,
+    align     : isDoughnut ? "end" : isHBar ? "end" : "top",
+    offset    : isDoughnut ? 18    : isHBar  ? 4    : isLine ? 8 : 4,
     clamp     : true,
     clip      : false,
-    padding   : { top: 0, bottom: 0, left: 2, right: 2 },
+    padding   : { top: 0, bottom: 0, left: isHBar ? 4 : 2, right: 2 },
   };
 
   // Always add layout padding so chart size is stable (doesn't jump on toggle)
