@@ -2110,31 +2110,60 @@ const presSlideRenderers = {
 
   // 3. Status
   status(d, el) {
+    const STATUS_COLORS_MAP = { "Fechado": "#10b981", "Resolvido": "#00d4ff", "Aberto": "#f59e0b", "Pendente": "#a855f7", "Em Espera": "#f97316", "Novo": "#ef4444" };
     const statusCount = {};
     d.forEach((r) => { const k = translateStatus(r.st); statusCount[k] = (statusCount[k] || 0) + 1; });
-    const wrap = document.createElement("div");
-    wrap.className = "pres-chart-wrap";
-    wrap.innerHTML = `<canvas id="pres-canvas-status"></canvas>`;
-    el.appendChild(wrap);
+    const combined = Object.entries(statusCount).sort((a, b) => b[1] - a[1]);
+    const stLabels = combined.map(e => e[0]);
+    const stValues = combined.map(e => e[1]);
+    const stColors = stLabels.map((l, i) => STATUS_COLORS_MAP[l] || COLORS[i % COLORS.length]);
+    const total = stValues.reduce((a, b) => a + b, 0);
+
+    // Layout: canvas à esquerda + legenda HTML à direita (igual ao dashboard principal)
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;flex:1;gap:32px;align-items:center;min-height:0;";
+
+    const canvasWrap = document.createElement("div");
+    canvasWrap.style.cssText = "flex:1.2;min-height:0;position:relative;";
+    canvasWrap.innerHTML = `<canvas id="pres-canvas-status"></canvas>`;
+    row.appendChild(canvasWrap);
+
+    // Legenda HTML — igual ao donut-legend do dashboard principal
+    const legendWrap = document.createElement("div");
+    legendWrap.style.cssText = "flex:0.8;display:flex;flex-direction:column;gap:10px;overflow:auto;max-height:100%;";
+    legendWrap.innerHTML = stLabels.map((label, i) => {
+      const pctVal = total ? Math.round((stValues[i] / total) * 100) : 0;
+      return `<div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:14px;height:14px;border-radius:3px;background:${stColors[i]};flex-shrink:0"></div>
+        <span style="flex:1;color:#e2e8f0;font-size:clamp(13px,1.1vw,16px);font-family:'DM Sans',sans-serif">${label}</span>
+        <span style="color:#94a3b8;font-size:clamp(12px,1vw,14px);font-family:'DM Sans',sans-serif">${stValues[i].toLocaleString("pt-BR")}</span>
+        <span style="color:${stColors[i]};font-weight:700;font-size:clamp(13px,1.1vw,16px);font-family:'DM Sans',sans-serif;min-width:42px;text-align:right">${pctVal}%</span>
+      </div>`;
+    }).join("");
+    row.appendChild(legendWrap);
+
+    el.appendChild(row);
+    el.style.flexDirection = "column";
+
     makePresChart("pres-canvas-status", {
       type: "doughnut",
       data: {
-        labels: Object.keys(statusCount),
-        datasets: [{ data: Object.values(statusCount),
-          backgroundColor: ["#10b981", "#00d4ff", "#f59e0b", "#ef4444"], borderWidth: 0 }],
+        labels: stLabels,
+        datasets: [{ data: stValues, backgroundColor: stColors, borderWidth: 0, hoverOffset: 6 }],
       },
       options: {
-        responsive: true, maintainAspectRatio: false, cutout: "60%",
+        responsive: true, maintainAspectRatio: false, cutout: "68%",
         plugins: {
-          legend: { position: "bottom", labels: { color: "#e2e8f0", font: { size: 16 }, padding: 20 } },
-          tooltip: presChartOpts.plugins.tooltip,
+          legend: { display: false },
+          tooltip: {
+            ...presChartOpts.plugins.tooltip,
+            callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toLocaleString("pt-BR")} (${total ? Math.round((ctx.parsed / total) * 100) : 0}%)` },
+          },
           datalabels: {
-            display: true, color: "#fff",
-            font: { family: "DM Sans", size: 16, weight: "normal" },
-            formatter: (v, ctx) => {
-              const t = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-              return Math.round((v / t) * 100) + "%";
-            },
+            display: (ctx) => { const v = ctx.dataset.data[ctx.dataIndex]; return total ? (v / total) >= 0.03 : false; },
+            color: "#fff",
+            font: { family: "DM Sans", size: 18, weight: "600" },
+            formatter: (v) => total ? Math.round((v / total) * 100) + "%" : "",
           },
         },
       },
@@ -2417,7 +2446,7 @@ const presSlideRenderers = {
   "volume-month"(d, el) {
     const cnt = {};
     d.forEach((r) => { if (r.mo) cnt[r.mo] = (cnt[r.mo] || 0) + 1; });
-    const months = Object.keys(cnt);
+    const months = sortMonths(new Set(Object.keys(cnt)));
     const wrap = document.createElement("div");
     wrap.className = "pres-chart-wrap";
     wrap.innerHTML = `<canvas id="pres-canvas-vol-month"></canvas>`;
@@ -2436,30 +2465,56 @@ const presSlideRenderers = {
   // 14. Motivo do Contato (pizza)
   "motivo-pie"(d, el) {
     const cnt = {};
-    d.forEach((r) => { cnt[r.mt] = (cnt[r.mt] || 0) + 1; });
-    const wrap = document.createElement("div");
-    wrap.className = "pres-chart-wrap";
-    wrap.innerHTML = `<canvas id="pres-canvas-motivo-pie"></canvas>`;
-    el.appendChild(wrap);
+    d.forEach((r) => { if (r.mt) cnt[r.mt] = (cnt[r.mt] || 0) + 1; });
+    const mColors = ["#00d4ff", "#7c3aed", "#ef4444", "#f59e0b", "#10b981", "#f97316"];
+    const combined = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+    const mLabels = combined.map(e => e[0]);
+    const mValues = combined.map(e => e[1]);
+    const mColorsUsed = mLabels.map((_, i) => mColors[i % mColors.length]);
+    const total = mValues.reduce((a, b) => a + b, 0);
+
+    // Layout lado a lado: donut + legenda HTML
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;flex:1;gap:32px;align-items:center;min-height:0;";
+
+    const canvasWrap = document.createElement("div");
+    canvasWrap.style.cssText = "flex:1.2;min-height:0;position:relative;";
+    canvasWrap.innerHTML = `<canvas id="pres-canvas-motivo-pie"></canvas>`;
+    row.appendChild(canvasWrap);
+
+    const legendWrap = document.createElement("div");
+    legendWrap.style.cssText = "flex:0.8;display:flex;flex-direction:column;gap:10px;overflow:auto;max-height:100%;";
+    legendWrap.innerHTML = mLabels.map((label, i) => {
+      const pctVal = total ? Math.round((mValues[i] / total) * 100) : 0;
+      return `<div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:14px;height:14px;border-radius:3px;background:${mColorsUsed[i]};flex-shrink:0"></div>
+        <span style="flex:1;color:#e2e8f0;font-size:clamp(13px,1.1vw,16px);font-family:'DM Sans',sans-serif">${label}</span>
+        <span style="color:#94a3b8;font-size:clamp(12px,1vw,14px);font-family:'DM Sans',sans-serif">${mValues[i].toLocaleString("pt-BR")}</span>
+        <span style="color:${mColorsUsed[i]};font-weight:700;font-size:clamp(13px,1.1vw,16px);font-family:'DM Sans',sans-serif;min-width:42px;text-align:right">${pctVal}%</span>
+      </div>`;
+    }).join("");
+    row.appendChild(legendWrap);
+    el.appendChild(row);
+
     makePresChart("pres-canvas-motivo-pie", {
       type: "doughnut",
       data: {
-        labels: Object.keys(cnt),
-        datasets: [{ data: Object.values(cnt),
-          backgroundColor: ["#00d4ff", "#7c3aed", "#ef4444", "#f59e0b", "#10b981"], borderWidth: 0 }],
+        labels: mLabels,
+        datasets: [{ data: mValues, backgroundColor: mColorsUsed, borderWidth: 0, hoverOffset: 6 }],
       },
       options: {
-        responsive: true, maintainAspectRatio: false, cutout: "55%",
+        responsive: true, maintainAspectRatio: false, cutout: "63%",
         plugins: {
-          legend: { position: "bottom", labels: { color: "#e2e8f0", font: { size: 16 }, padding: 22 } },
-          tooltip: presChartOpts.plugins.tooltip,
+          legend: { display: false },
+          tooltip: {
+            ...presChartOpts.plugins.tooltip,
+            callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toLocaleString("pt-BR")} (${total ? Math.round((ctx.parsed / total) * 100) : 0}%)` },
+          },
           datalabels: {
-            display: true, color: "#fff",
-            font: { family: "DM Sans", size: 16, weight: "normal" },
-            formatter: (v, ctx) => {
-              const t = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-              return Math.round((v / t) * 100) + "%";
-            },
+            display: (ctx) => { const v = ctx.dataset.data[ctx.dataIndex]; return total ? (v / total) >= 0.015 : false; },
+            color: "#fff",
+            font: { family: "DM Sans", size: 18, weight: "600" },
+            formatter: (v) => total ? Math.round((v / total) * 100) + "%" : "",
           },
         },
       },
@@ -2468,7 +2523,7 @@ const presSlideRenderers = {
 
   // 15. Evolução Mensal SLA
   "sla-trend"(d, el) {
-    const months = [...new Set(d.map((r) => r.mo).filter(Boolean))];
+    const months = sortMonths(new Set(d.map((r) => r.mo).filter(Boolean)));
     const mFR = months.map((m) => Math.round(avg(d.filter((r) => r.mo === m).map((r) => r.fr).filter((v) => v != null))));
     const mTR = months.map((m) => Math.round(avg(d.filter((r) => r.mo === m).map((r) => r.tr).filter((v) => v != null)) / 10));
     const wrap = document.createElement("div");
@@ -2653,7 +2708,7 @@ const presSlideRenderers = {
 
   // 23. Motivos por Mês
   "motivo-month"(d, el) {
-    const months = [...new Set(d.map((r) => r.mo).filter(Boolean))];
+    const months = sortMonths(new Set(d.map((r) => r.mo).filter(Boolean)));
     const motivos = [...new Set(d.map((r) => r.mt).filter(Boolean))];
     const wrap = document.createElement("div");
     wrap.className = "pres-chart-wrap";
@@ -2675,7 +2730,7 @@ const presSlideRenderers = {
 
   // 24. Tabulação por Mês
   "tab-month"(d, el) {
-    const months = [...new Set(d.map((r) => r.mo).filter(Boolean))];
+    const months = sortMonths(new Set(d.map((r) => r.mo).filter(Boolean)));
     const tabCnt = {};
     d.forEach((r) => { if (r.tb) tabCnt[r.tb] = (tabCnt[r.tb] || 0) + 1; });
     const tabs = Object.entries(tabCnt).sort((a, b) => b[1] - a[1]).slice(0, 5).map((e) => e[0]);
